@@ -12,6 +12,7 @@ from homeassistant.helpers import config_validation as cv
 
 from .const import COMPONENTS, DOMAIN, PLATFORMS
 from .coordinator import PrinterMaintenanceCoordinator
+from .frontend import async_register_frontend
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -68,8 +69,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
 
-    # Register services once (when first entry is loaded)
+    # Register frontend card and services once (first entry only)
     if not hass.services.has_service(DOMAIN, "reset_component"):
+        await async_register_frontend(hass)
         _register_services(hass)
 
     return True

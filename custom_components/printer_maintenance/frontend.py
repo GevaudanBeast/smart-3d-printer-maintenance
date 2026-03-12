@@ -1,0 +1,36 @@
+"""Register the Lovelace custom card with Home Assistant's frontend."""
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+
+from homeassistant.components.frontend import add_extra_js_url
+from homeassistant.components.http import StaticPathConfig
+from homeassistant.core import HomeAssistant
+
+_LOGGER = logging.getLogger(__name__)
+
+_URL_BASE = "/printer_maintenance"
+_CARD_FILE = "printer-maintenance-card.js"
+
+
+async def async_register_frontend(hass: HomeAssistant) -> None:
+    """Serve the card JS file and tell the frontend to load it."""
+    card_path = Path(__file__).parent / "www" / _CARD_FILE
+
+    if not card_path.exists():
+        _LOGGER.warning("Lovelace card not found at %s — skipping registration", card_path)
+        return
+
+    await hass.http.async_register_static_paths(
+        [
+            StaticPathConfig(
+                url_path=f"{_URL_BASE}/{_CARD_FILE}",
+                path=str(card_path),
+                cache_headers=False,
+            )
+        ]
+    )
+
+    add_extra_js_url(hass, f"{_URL_BASE}/{_CARD_FILE}")
+    _LOGGER.debug("Registered Lovelace card at %s/%s", _URL_BASE, _CARD_FILE)
