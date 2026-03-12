@@ -132,7 +132,8 @@ class PrinterMaintenanceCoordinator:
                 saved_start = self._data.get("session_start")
                 if saved_start:
                     try:
-                        self._print_start_time = datetime.fromisoformat(saved_start)
+                        parsed = dt_util.parse_datetime(saved_start)
+                        self._print_start_time = parsed if parsed else dt_util.utcnow()
                         _LOGGER.debug(
                             "Resumed ongoing print session started at %s",
                             self._print_start_time,
