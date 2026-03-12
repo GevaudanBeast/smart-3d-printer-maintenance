@@ -6,11 +6,11 @@ from typing import Any
 
 from homeassistant.components.sensor import (
     SensorEntity,
-    SensorEntityDescription,
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -27,7 +27,6 @@ from .coordinator import PrinterMaintenanceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-# Status → icon mapping
 STATUS_ICON = {
     STATUS_OK: "mdi:check-circle",
     STATUS_SOON: "mdi:alert-circle-outline",
@@ -92,6 +91,14 @@ class _BaseMaintenanceSensor(SensorEntity):
         self.async_write_ha_state()
 
 
+def _device_info(domain: str, unique_prefix: str, printer_name: str) -> DeviceInfo:
+    return DeviceInfo(
+        identifiers={(domain, unique_prefix)},
+        name=printer_name,
+        manufacturer="Printer Maintenance",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Global stats sensors
 # ---------------------------------------------------------------------------
@@ -101,17 +108,12 @@ class TotalPrintHoursSensor(_BaseMaintenanceSensor):
     _attr_icon = "mdi:clock-outline"
     _attr_native_unit_of_measurement = "h"
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
-    _attr_entity_category = None
 
     def __init__(self, coordinator: PrinterMaintenanceCoordinator, printer_name: str, unique_prefix: str) -> None:
         super().__init__(coordinator, printer_name, unique_prefix)
         self._attr_unique_id = f"{unique_prefix}_total_print_hours"
         self._attr_name = "Total Print Hours"
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, unique_prefix)},
-            "name": printer_name,
-            "manufacturer": "Printer Maintenance",
-        }
+        self._attr_device_info = _device_info(DOMAIN, unique_prefix, printer_name)
 
     @property
     def native_value(self) -> float:
@@ -128,16 +130,12 @@ class TotalFilamentSensor(_BaseMaintenanceSensor):
     _attr_icon = "mdi:spool"
     _attr_native_unit_of_measurement = "m"
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
-    _attr_entity_category = None
 
     def __init__(self, coordinator: PrinterMaintenanceCoordinator, printer_name: str, unique_prefix: str) -> None:
         super().__init__(coordinator, printer_name, unique_prefix)
         self._attr_unique_id = f"{unique_prefix}_total_filament"
         self._attr_name = "Total Filament Used"
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, unique_prefix)},
-            "name": printer_name,
-        }
+        self._attr_device_info = _device_info(DOMAIN, unique_prefix, printer_name)
 
     @property
     def native_value(self) -> float:
@@ -147,16 +145,12 @@ class TotalFilamentSensor(_BaseMaintenanceSensor):
 class TotalJobsSensor(_BaseMaintenanceSensor):
     _attr_icon = "mdi:counter"
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
-    _attr_entity_category = None
 
     def __init__(self, coordinator: PrinterMaintenanceCoordinator, printer_name: str, unique_prefix: str) -> None:
         super().__init__(coordinator, printer_name, unique_prefix)
         self._attr_unique_id = f"{unique_prefix}_total_jobs"
         self._attr_name = "Total Print Jobs"
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, unique_prefix)},
-            "name": printer_name,
-        }
+        self._attr_device_info = _device_info(DOMAIN, unique_prefix, printer_name)
 
     @property
     def native_value(self) -> int:
@@ -182,10 +176,7 @@ class _BaseComponentSensor(_BaseMaintenanceSensor):
         super().__init__(coordinator, printer_name, unique_prefix)
         self._comp_id = comp_id
         self._comp_info = comp_info
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, unique_prefix)},
-            "name": printer_name,
-        }
+        self._attr_device_info = _device_info(DOMAIN, unique_prefix, printer_name)
 
     def _comp_data(self) -> dict[str, Any]:
         return self._coordinator.get_component_data(self._comp_id)
@@ -208,10 +199,7 @@ class ComponentHoursUsedSensor(_BaseComponentSensor):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         d = self._comp_data()
-        return {
-            "interval_hours": d["interval_hours"],
-            "last_reset": d["last_reset"],
-        }
+        return {"interval_hours": d["interval_hours"], "last_reset": d["last_reset"]}
 
 
 class ComponentHoursRemainingSensor(_BaseComponentSensor):

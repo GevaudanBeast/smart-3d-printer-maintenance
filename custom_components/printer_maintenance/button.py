@@ -6,6 +6,7 @@ from typing import Any
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -49,10 +50,11 @@ class ResetComponentButton(ButtonEntity):
         self._attr_unique_id = f"{unique_prefix}_reset_{comp_id}"
         self._attr_name = f"Reset {comp_info['name']}"
         self._attr_icon = "mdi:restore"
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, unique_prefix)},
-            "name": printer_name,
-        }
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, unique_prefix)},
+            name=printer_name,
+            manufacturer="Printer Maintenance",
+        )
 
     async def async_press(self) -> None:
         await self._coordinator.async_reset_component(self._comp_id)
