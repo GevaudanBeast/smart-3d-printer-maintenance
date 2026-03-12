@@ -80,7 +80,8 @@ class PrinterMaintenanceCard extends HTMLElement {
     const title         = this._config.title || this._config.printer.toUpperCase();
     const totalHours    = parseFloat(this._val(this._sid("total_print_hours"), 0)).toFixed(1);
     const totalFilament = parseFloat(this._val(this._sid("total_filament_used"), 0)).toFixed(1);
-    const totalJobs     = this._val(this._sid("total_print_jobs"), "0");
+    const totalJobsOk   = this._val(this._sid("total_jobs_ok"),  "0");
+    const totalJobsKo   = this._val(this._sid("total_jobs_failed"), "0");
 
     // ── component rows ───────────────────────────────────────────────────────
     let rows = "";
@@ -136,7 +137,7 @@ class PrinterMaintenanceCard extends HTMLElement {
         .title  { display: flex; align-items: center; gap: 7px; font-size: 1.05em; font-weight: 600; }
 
         /* stats */
-        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+        .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
         .stat  { background: var(--secondary-background-color, rgba(255,255,255,.06)); border-radius: 8px; padding: 8px 4px 7px; text-align: center; }
         .stat-val { font-size: 1.05em; font-weight: 700; line-height: 1.2; }
         .stat-lbl { font-size: 0.62em; opacity: .55; text-transform: uppercase; letter-spacing: .6px; margin-top: 2px; }
@@ -234,8 +235,12 @@ class PrinterMaintenanceCard extends HTMLElement {
               <div class="stat-lbl">Filament</div>
             </div>
             <div class="stat">
-              <div class="stat-val">${totalJobs}</div>
-              <div class="stat-lbl">Jobs</div>
+              <div class="stat-val" style="color:var(--success-color,#4CAF50)">${totalJobsOk} ✓</div>
+              <div class="stat-lbl">Jobs OK</div>
+            </div>
+            <div class="stat">
+              <div class="stat-val" style="color:var(--error-color,#F44336)">${totalJobsKo} ✗</div>
+              <div class="stat-lbl">Jobs KO</div>
             </div>
           </div>
 

@@ -11,6 +11,8 @@ CONF_PRINTER_BRAND = "printer_brand"
 CONF_PRINTER_MODEL = "printer_model"
 CONF_STATUS_ENTITY = "status_entity"
 CONF_PRINTING_STATES = "printing_states"
+CONF_PAUSED_STATES = "paused_states"
+CONF_COMPLETED_STATES = "completed_states"
 CONF_FILAMENT_ENTITY = "filament_entity"
 CONF_COMPONENTS = "components"
 
@@ -27,6 +29,10 @@ STATUS_OVERDUE = "overdue"
 SOON_THRESHOLD_PCT = 0.20
 
 DEFAULT_PRINTING_STATES = ["printing"]
+# States where the session is paused but NOT ended (time stops, no job count yet)
+DEFAULT_PAUSED_STATES = ["paused", "pause"]
+# States that mean a successful completion → jobs_ok
+DEFAULT_COMPLETED_STATES = ["completed", "complete", "finish"]
 
 # Supported printer brands
 PRINTER_BRANDS = [

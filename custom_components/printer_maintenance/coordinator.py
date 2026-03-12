@@ -13,10 +13,14 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     COMPONENTS,
+    CONF_COMPLETED_STATES,
     CONF_COMPONENTS,
     CONF_FILAMENT_ENTITY,
+    CONF_PAUSED_STATES,
     CONF_PRINTING_STATES,
     CONF_STATUS_ENTITY,
+    DEFAULT_COMPLETED_STATES,
+    DEFAULT_PAUSED_STATES,
     DEFAULT_PRINTING_STATES,
     DOMAIN,
     SOON_THRESHOLD_PCT,
@@ -30,6 +34,10 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# Minimum session duration to be counted as a real job (avoids false counts
+# from brief status flickers or accidental cancellations).
+_MIN_JOB_HOURS = 1 / 60  # 1 minute
+
 
 class PrinterMaintenanceCoordinator:
     """Manage print-time tracking and maintenance counters for one printer."""
@@ -39,9 +47,11 @@ class PrinterMaintenanceCoordinator:
         self.entry = entry
         self._store = Store(hass, STORAGE_VERSION, STORAGE_KEY.format(entry.entry_id))
         self._data: dict[str, Any] = {}
+        # Current printing segment start time (None when paused or idle)
         self._print_start_time: datetime | None = None
+        # Hours accumulated in previous segments of the same session (across pauses)
+        self._session_hours: float = 0.0
         self._unsubscribers: list[Any] = []
-        # Entities register a callback here to receive update notifications
         self.listeners: list[Any] = []
 
     # ------------------------------------------------------------------
@@ -49,7 +59,6 @@ class PrinterMaintenanceCoordinator:
     # ------------------------------------------------------------------
 
     def _opt(self, key: str, default: Any = None) -> Any:
-        """Read a value from options first, then data, then default."""
         return self.entry.options.get(key, self.entry.data.get(key, default))
 
     @property
@@ -59,6 +68,14 @@ class PrinterMaintenanceCoordinator:
     @property
     def printing_states(self) -> list[str]:
         return self._opt(CONF_PRINTING_STATES, DEFAULT_PRINTING_STATES)
+
+    @property
+    def paused_states(self) -> list[str]:
+        return self._opt(CONF_PAUSED_STATES, DEFAULT_PAUSED_STATES)
+
+    @property
+    def completed_states(self) -> list[str]:
+        return self._opt(CONF_COMPLETED_STATES, DEFAULT_COMPLETED_STATES)
 
     @property
     def filament_entity(self) -> str | None:
@@ -75,6 +92,14 @@ class PrinterMaintenanceCoordinator:
     @property
     def total_jobs(self) -> int:
         return self._data.get("total_jobs", 0)
+
+    @property
+    def total_jobs_ok(self) -> int:
+        return self._data.get("total_jobs_ok", 0)
+
+    @property
+    def total_jobs_ko(self) -> int:
+        return self._data.get("total_jobs_ko", 0)
 
     @property
     def is_currently_printing(self) -> bool:
@@ -120,39 +145,45 @@ class PrinterMaintenanceCoordinator:
         """Load persisted data and subscribe to state changes."""
         await self._async_load_data()
 
-        if self.status_entity:
-            self._unsubscribers.append(
-                async_track_state_change_event(
-                    self.hass, [self.status_entity], self._handle_status_change
-                )
+        if not self.status_entity:
+            return
+
+        self._unsubscribers.append(
+            async_track_state_change_event(
+                self.hass, [self.status_entity], self._handle_status_change
             )
-            # If the printer is already printing when HA starts, resume session
-            current = self.hass.states.get(self.status_entity)
-            if current and current.state in self.printing_states:
-                saved_start = self._data.get("session_start")
-                if saved_start:
-                    try:
-                        parsed = dt_util.parse_datetime(saved_start)
-                        self._print_start_time = parsed if parsed else dt_util.utcnow()
-                        _LOGGER.debug(
-                            "Resumed ongoing print session started at %s",
-                            self._print_start_time,
-                        )
-                    except (ValueError, TypeError):
-                        self._print_start_time = dt_util.utcnow()
-                else:
-                    self._print_start_time = dt_util.utcnow()
+        )
+
+        # Restore in-progress session after HA restart
+        current = self.hass.states.get(self.status_entity)
+        if current is None:
+            return
+
+        state = current.state
+        if state in self.printing_states:
+            self._session_hours = self._data.get("session_hours", 0.0)
+            saved_start = self._data.get("session_start")
+            if saved_start:
+                parsed = dt_util.parse_datetime(saved_start)
+                self._print_start_time = parsed if parsed else dt_util.utcnow()
+                _LOGGER.debug("Resumed printing session from %s", self._print_start_time)
+            else:
+                self._print_start_time = dt_util.utcnow()
+
+        elif state in self.paused_states:
+            # Session paused: restore accumulated hours, no active segment
+            self._session_hours = self._data.get("session_hours", 0.0)
+            _LOGGER.debug("Restored paused session (%.2f h so far)", self._session_hours)
 
     async def async_shutdown(self) -> None:
-        """Unsubscribe listeners and persist current state."""
+        """Unsubscribe and persist state."""
         for unsub in self._unsubscribers:
             unsub()
         self._unsubscribers.clear()
-        # Persist session_start so we can resume after restart
         await self._async_save_data()
 
     # ------------------------------------------------------------------
-    # State change handler
+    # State machine
     # ------------------------------------------------------------------
 
     @callback
@@ -163,26 +194,64 @@ class PrinterMaintenanceCoordinator:
         if new_state is None:
             return
 
-        is_printing = new_state.state in self.printing_states
-        was_printing = old_state is not None and old_state.state in self.printing_states
+        new = new_state.state
+        old = old_state.state if old_state else None
 
+        is_printing = new in self.printing_states
+        was_printing = old in self.printing_states
+        is_paused = new in self.paused_states
+        was_paused = old in self.paused_states
+
+        # ── Print started (from idle, stopped, OR resumed from pause) ────────
         if is_printing and not was_printing:
+            if not was_paused:
+                # Fresh session start
+                self._session_hours = 0.0
+                self._data["session_hours"] = 0.0
+            # Mark start of this printing segment
             self._print_start_time = dt_util.utcnow()
             self._data["session_start"] = self._print_start_time.isoformat()
             self.hass.async_create_task(self._async_save_data())
-            _LOGGER.debug("Print session started")
+            _LOGGER.debug("Print segment started (session_hours=%.2f)", self._session_hours)
 
-        elif was_printing and not is_printing:
+        # ── Paused (from printing) ────────────────────────────────────────────
+        elif is_paused and was_printing:
             if self._print_start_time:
-                elapsed_hours = (
-                    dt_util.utcnow() - self._print_start_time
-                ).total_seconds() / 3600
-                self._apply_print_hours(elapsed_hours)
-                self._data["total_jobs"] = self._data.get("total_jobs", 0) + 1
+                elapsed = (dt_util.utcnow() - self._print_start_time).total_seconds() / 3600
+                self._session_hours += elapsed
                 self._print_start_time = None
-                self._data.pop("session_start", None)
-                self.hass.async_create_task(self._async_save_data())
-                _LOGGER.debug("Print session ended: %.2f h added", elapsed_hours)
+            self._data["session_hours"] = self._session_hours
+            self._data.pop("session_start", None)
+            self.hass.async_create_task(self._async_save_data())
+            _LOGGER.debug("Print paused (session_hours=%.2f)", self._session_hours)
+
+        # ── Session ended (from printing or paused → any final state) ─────────
+        elif not is_printing and not is_paused and (was_printing or was_paused):
+            if self._print_start_time:
+                elapsed = (dt_util.utcnow() - self._print_start_time).total_seconds() / 3600
+                self._session_hours += elapsed
+                self._print_start_time = None
+
+            total = self._session_hours
+            self._session_hours = 0.0
+
+            if total >= _MIN_JOB_HOURS:
+                self._apply_print_hours(total)
+                if new in self.completed_states:
+                    self._data["total_jobs_ok"] = self._data.get("total_jobs_ok", 0) + 1
+                    _LOGGER.debug("Job OK — %.2f h added", total)
+                else:
+                    self._data["total_jobs_ko"] = self._data.get("total_jobs_ko", 0) + 1
+                    _LOGGER.debug("Job KO (%s) — %.2f h added", new, total)
+                self._data["total_jobs"] = self._data.get("total_jobs", 0) + 1
+            else:
+                _LOGGER.debug(
+                    "Session too short (%.1f s) — not counted", total * 3600
+                )
+
+            self._data.pop("session_start", None)
+            self._data.pop("session_hours", None)
+            self.hass.async_create_task(self._async_save_data())
 
         self._notify_listeners()
 
@@ -204,7 +273,6 @@ class PrinterMaintenanceCoordinator:
         stored = await self._store.async_load()
         if stored:
             self._data = stored
-            # Ensure all known components exist in stored data
             components = self._data.setdefault("components", {})
             for comp_id in COMPONENTS:
                 components.setdefault(comp_id, {"hours_used": 0.0, "last_reset": None})
@@ -213,6 +281,8 @@ class PrinterMaintenanceCoordinator:
                 "total_print_hours": 0.0,
                 "total_filament_m": 0.0,
                 "total_jobs": 0,
+                "total_jobs_ok": 0,
+                "total_jobs_ko": 0,
                 "components": {
                     comp_id: {"hours_used": 0.0, "last_reset": None}
                     for comp_id in COMPONENTS
@@ -231,7 +301,6 @@ class PrinterMaintenanceCoordinator:
     # ------------------------------------------------------------------
 
     async def async_reset_component(self, component_id: str) -> None:
-        """Reset a component's usage counter."""
         components = self._data.setdefault("components", {})
         components.setdefault(component_id, {})
         components[component_id]["hours_used"] = 0.0
@@ -241,7 +310,6 @@ class PrinterMaintenanceCoordinator:
         _LOGGER.info("Reset maintenance counter for component: %s", component_id)
 
     async def async_set_interval(self, component_id: str, interval_hours: float) -> None:
-        """Update the maintenance interval for a component."""
         options = dict(self.entry.options)
         comp_opts = dict(options.get(CONF_COMPONENTS, {}))
         comp_opt = dict(comp_opts.get(component_id, {}))
@@ -254,7 +322,6 @@ class PrinterMaintenanceCoordinator:
     async def async_add_hours(
         self, hours: float, component_id: str | None = None
     ) -> None:
-        """Manually add print hours (retroactive correction)."""
         if component_id:
             components = self._data.setdefault("components", {})
             comp = components.setdefault(

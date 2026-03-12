@@ -48,6 +48,8 @@ async def async_setup_entry(
         TotalPrintHoursSensor(coordinator, printer_name, unique_prefix),
         TotalFilamentSensor(coordinator, printer_name, unique_prefix),
         TotalJobsSensor(coordinator, printer_name, unique_prefix),
+        TotalJobsOkSensor(coordinator, printer_name, unique_prefix),
+        TotalJobsKoSensor(coordinator, printer_name, unique_prefix),
     ]
 
     for comp_id, comp_info in COMPONENTS.items():
@@ -241,3 +243,33 @@ class ComponentStatusSensor(_BaseComponentSensor):
             "interval_hours": d["interval_hours"],
             "last_reset": d["last_reset"],
         }
+
+
+class TotalJobsOkSensor(_BaseMaintenanceSensor):
+    _attr_icon = "mdi:check-circle-outline"
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    def __init__(self, coordinator: PrinterMaintenanceCoordinator, printer_name: str, unique_prefix: str) -> None:
+        super().__init__(coordinator, printer_name, unique_prefix)
+        self._attr_unique_id = f"{unique_prefix}_total_jobs_ok"
+        self._attr_name = "Total Jobs OK"
+        self._attr_device_info = _device_info(DOMAIN, unique_prefix, printer_name)
+
+    @property
+    def native_value(self) -> int:
+        return self._coordinator.total_jobs_ok
+
+
+class TotalJobsKoSensor(_BaseMaintenanceSensor):
+    _attr_icon = "mdi:close-circle-outline"
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    def __init__(self, coordinator: PrinterMaintenanceCoordinator, printer_name: str, unique_prefix: str) -> None:
+        super().__init__(coordinator, printer_name, unique_prefix)
+        self._attr_unique_id = f"{unique_prefix}_total_jobs_ko"
+        self._attr_name = "Total Jobs Failed"
+        self._attr_device_info = _device_info(DOMAIN, unique_prefix, printer_name)
+
+    @property
+    def native_value(self) -> int:
+        return self._coordinator.total_jobs_ko
