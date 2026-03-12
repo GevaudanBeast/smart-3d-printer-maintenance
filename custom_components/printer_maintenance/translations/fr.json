@@ -1,0 +1,69 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Identité de l'imprimante",
+        "description": "Renseignez les informations de votre imprimante 3D.",
+        "data": {
+          "printer_name": "Nom de l'imprimante",
+          "printer_brand": "Marque",
+          "printer_model": "Modèle"
+        }
+      },
+      "entities": {
+        "title": "Entités Home Assistant",
+        "description": "Sélectionnez l'entité HA qui indique l'état courant de l'imprimante. Le champ 'États d'impression' accepte des valeurs séparées par des virgules (ex. `printing, busy`).",
+        "data": {
+          "status_entity": "Entité état d'impression",
+          "printing_states": "Valeurs d'état « en impression » (séparées par des virgules)",
+          "filament_entity": "Entité filament utilisé (optionnel)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Connexion impossible",
+      "unknown": "Erreur inattendue"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Entités & Paramètres",
+        "data": {
+          "status_entity": "Entité état d'impression",
+          "printing_states": "Valeurs d'état « en impression » (séparées par des virgules)",
+          "filament_entity": "Entité filament utilisé (optionnel)"
+        }
+      },
+      "intervals": {
+        "title": "Intervalles de maintenance",
+        "description": "Définissez l'intervalle de maintenance (heures d'impression) pour chaque composant.",
+        "data": {
+          "interval_nozzle": "Buse",
+          "interval_heatbreak": "Heatbreak",
+          "interval_extruder_gear": "Engrenage extrudeur",
+          "interval_belts": "Courroies",
+          "interval_linear_rods": "Tiges linéaires",
+          "interval_linear_rails": "Rails linéaires",
+          "interval_build_plate": "Plateau d'impression",
+          "interval_build_surface": "Surface d'impression",
+          "interval_hotend_fan": "Ventilateur hotend",
+          "interval_part_cooling_fan": "Ventilateur de refroidissement",
+          "interval_ptfe_tube": "Tube PTFE"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "state": {
+          "ok": "OK",
+          "soon": "Maintenance prochaine",
+          "due": "Maintenance requise",
+          "overdue": "En retard"
+        }
+      }
+    }
+  }
+}

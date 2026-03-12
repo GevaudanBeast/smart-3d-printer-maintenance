@@ -1,0 +1,69 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Printer Identity",
+        "description": "Enter information about your 3D printer.",
+        "data": {
+          "printer_name": "Printer name",
+          "printer_brand": "Brand",
+          "printer_model": "Model"
+        }
+      },
+      "entities": {
+        "title": "Home Assistant Entities",
+        "description": "Select the HA entity that reports the printer's current state. The 'Printing states' field accepts comma-separated values (e.g. `printing, busy`).",
+        "data": {
+          "status_entity": "Print status entity",
+          "printing_states": "Printing state values (comma-separated)",
+          "filament_entity": "Filament used entity (optional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect",
+      "unknown": "Unexpected error"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Entities & Settings",
+        "data": {
+          "status_entity": "Print status entity",
+          "printing_states": "Printing state values (comma-separated)",
+          "filament_entity": "Filament used entity (optional)"
+        }
+      },
+      "intervals": {
+        "title": "Maintenance Intervals",
+        "description": "Set the maintenance interval (print hours) for each component.",
+        "data": {
+          "interval_nozzle": "Nozzle",
+          "interval_heatbreak": "Heatbreak",
+          "interval_extruder_gear": "Extruder Gear",
+          "interval_belts": "Belts",
+          "interval_linear_rods": "Linear Rods",
+          "interval_linear_rails": "Linear Rails",
+          "interval_build_plate": "Build Plate",
+          "interval_build_surface": "Build Surface",
+          "interval_hotend_fan": "Hotend Fan",
+          "interval_part_cooling_fan": "Part Cooling Fan",
+          "interval_ptfe_tube": "PTFE Tube"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "state": {
+          "ok": "OK",
+          "soon": "Maintenance soon",
+          "due": "Maintenance due",
+          "overdue": "Overdue"
+        }
+      }
+    }
+  }
+}

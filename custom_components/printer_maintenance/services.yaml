@@ -1,0 +1,115 @@
+reset_component:
+  name: Reset Component Counter
+  description: >
+    Reset the maintenance usage counter for a specific component. Use this
+    after performing maintenance (e.g. replacing the nozzle).
+  fields:
+    component:
+      name: Component
+      description: The component whose counter should be reset.
+      required: true
+      selector:
+        select:
+          options:
+            - nozzle
+            - heatbreak
+            - extruder_gear
+            - belts
+            - linear_rods
+            - linear_rails
+            - build_plate
+            - build_surface
+            - hotend_fan
+            - part_cooling_fan
+            - ptfe_tube
+    entry_id:
+      name: Printer (entry ID)
+      description: >
+        Config entry ID of the target printer. Leave empty to apply to all
+        configured printers.
+      required: false
+      selector:
+        text:
+
+set_interval:
+  name: Set Maintenance Interval
+  description: >
+    Update the maintenance interval (in hours) for a specific component.
+  fields:
+    component:
+      name: Component
+      description: The component to configure.
+      required: true
+      selector:
+        select:
+          options:
+            - nozzle
+            - heatbreak
+            - extruder_gear
+            - belts
+            - linear_rods
+            - linear_rails
+            - build_plate
+            - build_surface
+            - hotend_fan
+            - part_cooling_fan
+            - ptfe_tube
+    interval_hours:
+      name: Interval (hours)
+      description: Maintenance interval in print hours.
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 10000
+          step: 1
+          unit_of_measurement: h
+    entry_id:
+      name: Printer (entry ID)
+      description: Config entry ID of the target printer. Leave empty for all.
+      required: false
+      selector:
+        text:
+
+add_hours:
+  name: Add Print Hours
+  description: >
+    Manually add print hours to the counters. Useful for retroactive
+    data entry when the integration was not running.
+  fields:
+    hours:
+      name: Hours
+      description: Number of print hours to add.
+      required: true
+      selector:
+        number:
+          min: 0.01
+          max: 10000
+          step: 0.1
+          unit_of_measurement: h
+    component:
+      name: Component (optional)
+      description: >
+        If specified, only this component's counter is incremented.
+        Leave empty to add hours to all components and the global total.
+      required: false
+      selector:
+        select:
+          options:
+            - nozzle
+            - heatbreak
+            - extruder_gear
+            - belts
+            - linear_rods
+            - linear_rails
+            - build_plate
+            - build_surface
+            - hotend_fan
+            - part_cooling_fan
+            - ptfe_tube
+    entry_id:
+      name: Printer (entry ID)
+      description: Config entry ID of the target printer. Leave empty for all.
+      required: false
+      selector:
+        text:
