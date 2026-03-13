@@ -1,110 +1,76 @@
 class PrinterMaintenanceCard extends HTMLElement {
-  set editMode(editMode) {
-    this._editMode = editMode;
-  }
-
   set hass(hass) {
+    this._hass = hass;
     if (!this.content) {
-      this.innerHTML = `
-        <ha-card>
-          <div id="container" style="padding: 16px;"></div>
-        </ha-card>
-      `;
-      this.content = this.querySelector("#container");
+      const card = document.createElement('ha-card');
+      this.content = document.createElement('div');
+      this.content.style.padding = '16px';
+      card.appendChild(this.content);
+      this.appendChild(card);
     }
 
-    const config = this._config;
-    const printer = config.printer;
+    const printer = this._config.printer;
+    const title = this._config.title || "Maintenance Imprimante";
 
-    // Récupération des entités dynamiques basées sur le nom de l'imprimante
+    // Récupération des entités dynamiques
     const nozzleHours = hass.states[`input_number.${printer}_aur_maint_nozzle_hours`]?.state || "0";
-    const nozzleLimit = hass.states[`input_number.${printer}_aur_thr_nozzle_replace_h`]?.state || "300";
+    const nozzleMax = hass.states[`input_number.${printer}_aur_thr_nozzle_replace_h`]?.state || "300";
     const totalHours = hass.states[`input_number.${printer}_aur_maint_total_hours`]?.state || "0";
-    const totalFilament = hass.states[`input_number.${printer}_aur_maint_total_filament_m`]?.state || "0";
     const jobsOk = hass.states[`counter.${printer}_aur_maint_jobs_ok`]?.state || "0";
     const jobsKo = hass.states[`counter.${printer}_aur_maint_jobs_ko`]?.state || "0";
 
-    const nozzlePercent = Math.min(Math.round((nozzleHours / nozzleLimit) * 100), 100);
-    const statusColor = jobsKo > 0 ? "#e74c3c" : "#2ecc71";
+    const percent = Math.min(Math.round((parseFloat(nozzleHours) / parseFloat(nozzleMax)) * 100), 100);
+    const color = percent > 90 ? "#e74c3c" : "#2ecc71";
 
     this.content.innerHTML = `
       <style>
-        .maint-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px; }
-        .maint-item { background: var(--secondary-background-color); padding: 10px; border-radius: 8px; text-align: center; }
-        .maint-label { font-size: 0.8em; color: var(--secondary-text-color); }
-        .maint-value { font-size: 1.1em; font-weight: bold; }
-        .progress-bar { background: var(--divider-color); border-radius: 5px; height: 10px; margin: 5px 0; overflow: hidden; }
-        .progress-fill { background: ${nozzlePercent > 90 ? '#e74c3c' : '#3498db'}; height: 100%; width: ${nozzlePercent}%; transition: width 0.5s; }
-        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-        .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 0.75em; color: white; background: ${statusColor}; }
+        .pm-header { font-size: 1.1em; font-weight: bold; margin-bottom: 10px; display: flex; justify-content: space-between; }
+        .pm-bar-container { background: var(--secondary-background-color); border-radius: 4px; height: 12px; margin: 8px 0; }
+        .pm-bar-fill { background: ${color}; height: 100%; border-radius: 4px; width: ${percent}%; transition: width 0.5s; }
+        .pm-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px; }
+        .pm-stat { background: var(--card-background-color); border: 1px solid var(--divider-color); padding: 8px; border-radius: 4px; text-align: center; }
+        .pm-label { font-size: 0.7em; color: var(--secondary-text-color); text-transform: uppercase; }
+        .pm-value { font-size: 1em; font-weight: bold; }
       </style>
       
-      <div class="header">
-        <div style="font-size: 1.2em; font-weight: bold;">${config.title || "Printer Maintenance"}</div>
-        <div class="status-badge">${jobsKo > 0 ? 'Erreur' : 'OK'}</div>
+      <div class="pm-header">
+        <span>${title}</span>
+        <span style="color: ${jobsKo > 0 ? '#e74c3c' : '#2ecc71'}">●</span>
       </div>
 
-      <div class="maint-label">Usure Buse (${nozzleHours}h / ${nozzleLimit}h)</div>
-      <div class="progress-bar"><div class="progress-fill"></div></div>
+      <div class="pm-label">Usure Buse : ${nozzleHours}h / ${nozzleMax}h</div>
+      <div class="pm-bar-container"><div class="pm-bar-fill"></div></div>
 
-      <div class="maint-grid">
-        <div class="maint-item">
-          <div class="maint-label">Total Heures</div>
-          <div class="maint-value">${totalHours}h</div>
-        </div>
-        <div class="maint-item">
-          <div class="maint-label">Filament</div>
-          <div class="maint-value">${totalFilament}m</div>
-        </div>
-        <div class="maint-item">
-          <div class="maint-label">Jobs OK</div>
-          <div class="maint-value" style="color: #2ecc71;">${jobsOk}</div>
-        </div>
-        <div class="maint-item">
-          <div class="maint-label">Jobs KO</div>
-          <div class="maint-value" style="color: #e74c3c;">${jobsKo}</div>
-        </div>
+      <div class="pm-grid">
+        <div class="pm-stat"><div class="pm-label">Total</div><div class="pm-value">${totalHours}h</div></div>
+        <div class="pm-stat"><div class="pm-label">Succès</div><div class="pm-value">${jobsOk}</div></div>
       </div>
 
-      <div style="margin-top: 15px; display: flex; gap: 5px;">
-        <mwc-button raised label="Reset Buse" id="reset-nozzle" style="flex: 1;"></mwc-button>
-        <mwc-button raised label="Reset All" id="reset-all" style="flex: 1; --mdc-theme-primary: #e74c3c;"></mwc-button>
-      </div>
+      <mwc-button label="Reset Buse" id="btn-reset" style="width: 100%; margin-top: 12px;"></mwc-button>
     `;
 
-    this.content.querySelector("#reset-nozzle").addEventListener("click", () => {
+    this.content.querySelector('#btn-reset').onclick = () => {
       hass.callService("script", `${printer}_aur_maint_nozzle_replaced`);
-    });
-
-    this.content.querySelector("#reset-all").addEventListener("click", () => {
-      if (confirm("Réinitialiser tous les compteurs ?")) {
-        hass.callService("script", `${printer}_aur_maint_reset_all`);
-      }
-    });
+    };
   }
 
   setConfig(config) {
-    if (!config.printer) {
-      throw new Error("Veuillez définir l'imprimante (ex: printer: k1c)");
-    }
+    if (!config.printer) throw new Error("Veuillez définir 'printer: k1c'");
     this._config = config;
   }
-
-  getCardSize() {
-    return 3;
-  }
 }
 
-// Sécurité pour éviter l'erreur "already been used"
+// PROTECTION CONTRE LES DOUBLONS ET ANCIENS NOMS
+// On utilise le nom définitif 'printer-maintenance-card'
 if (!customElements.get('printer-maintenance-card')) {
-  customElements.define('printer-maintenance-card', PrinterMaintenanceCard);
+    customElements.define('printer-maintenance-card', PrinterMaintenanceCard);
 }
 
-// Déclaration pour que HA reconnaisse la carte dans l'interface
+// Ajout pour l'interface visuelle HA
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "printer-maintenance-card",
   name: "Printer Maintenance Card",
-  description: "Carte personnalisée pour le suivi d'entretien d'imprimante 3D",
+  description: "Suivi de maintenance pour K1C",
   preview: true
 });
