@@ -28,16 +28,22 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
         _LOGGER.warning("Lovelace card not found at %s — skipping registration", card_path)
         return
 
-    await hass.http.async_register_static_paths(
-        [
-            StaticPathConfig(
-                url_path=_URL_BASE,
-                path=str(www_path),
-                cache_headers=False,
-            )
-        ]
-    )
+    try:
+        await hass.http.async_register_static_paths(
+            [
+                StaticPathConfig(
+                    url_path=_URL_BASE,
+                    path=str(www_path),
+                    cache_headers=False,
+                )
+            ]
+        )
+    except Exception as err:  # noqa: BLE001
+        # Path may already be registered (integration reload without HA restart).
+        # The file is still served; just continue to register the frontend URL.
+        _LOGGER.debug("Static path %s already registered: %s", _URL_BASE, err)
 
-    add_extra_js_url(hass, f"{_URL_BASE}/{_CARD_FILE}")
+    card_url = f"{_URL_BASE}/{_CARD_FILE}"
+    add_extra_js_url(hass, card_url)
     hass.data[_REGISTERED_KEY] = True
-    _LOGGER.info("Registered Lovelace card at %s/%s", _URL_BASE, _CARD_FILE)
+    _LOGGER.info("Registered Lovelace card at %s", card_url)
