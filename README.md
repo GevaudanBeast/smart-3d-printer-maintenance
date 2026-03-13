@@ -22,7 +22,7 @@ Designed first for the **Creality K1C** (with [`ha_creality_ws`](https://github.
 - **4 maintenance statuses**: `OK` · `Soon` · `Due` · `Overdue` (configurable alert threshold)
 - **36 sensors** (global stats + per-component hours used / remaining / status)
 - **11 reset buttons** (one per component, configurable category)
-- **3 services**: reset a counter, set an interval, add hours manually
+- **5 services**: reset a counter, set an interval, add hours, set total hours, set total filament
 - **Compact Lovelace card** — auto-registered, no manual resource setup, complementary to ha_creality_ws (no status/temperature duplication)
 - **Persistent storage** — survives HA restarts, resumes in-progress sessions
 - **Multi-printer** — one integration entry per printer
@@ -64,6 +64,7 @@ Designed first for the **Creality K1C** (with [`ha_creality_ws`](https://github.
 2. Search for **3D Printer Maintenance**
 3. **Step 1 — Printer identity**: name, brand, model
 4. **Step 2 — Entities**: select the HA sensor that reports the print status and enter the printing state value(s) (comma-separated, e.g. `printing`)
+5. **Step 3 — Initial counters** *(optional)*: pre-fill total print hours and filament already consumed (useful when migrating from a previous setup)
 
 > **K1C + ha_creality_ws example**
 > - Status entity: `sensor.k1c_print_status`
@@ -119,6 +120,8 @@ The card displays (designed to complement ha_creality_ws, no duplication):
 | `printer_maintenance.reset_component` | `component`, `entry_id` *(opt)* | Reset a component counter after maintenance |
 | `printer_maintenance.set_interval` | `component`, `interval_hours`, `entry_id` *(opt)* | Update a maintenance interval |
 | `printer_maintenance.add_hours` | `hours`, `component` *(opt)*, `entry_id` *(opt)* | Manually add print hours |
+| `printer_maintenance.set_total_hours` | `hours`, `entry_id` *(opt)* | Set the global print-hour counter to an exact value |
+| `printer_maintenance.set_total_filament` | `filament_metres`, `entry_id` *(opt)* | Set the global filament counter to an exact value (metres) |
 
 ### Status Logic
 
@@ -164,7 +167,7 @@ Conçue en priorité pour la **Creality K1C** (avec [`ha_creality_ws`](https://g
 - **4 statuts de maintenance** : `OK` · `Bientôt` · `Requis` · `En retard` (seuil d'alerte configurable)
 - **36 capteurs** (statistiques globales + heures utilisées / restantes / statut par composant)
 - **11 boutons de réinitialisation** (un par composant)
-- **3 services** : réinitialiser un compteur, définir un intervalle, ajouter des heures manuellement
+- **5 services** : réinitialiser un compteur, définir un intervalle, ajouter des heures, définir le total d'heures, définir le total de filament
 - **Carte Lovelace compacte** — enregistrée automatiquement, complémentaire à ha_creality_ws (aucune duplication de statut/température)
 - **Stockage persistant** — résiste aux redémarrages HA, reprend les sessions en cours
 - **Multi-imprimantes** — une entrée d'intégration par imprimante
@@ -206,6 +209,7 @@ Conçue en priorité pour la **Creality K1C** (avec [`ha_creality_ws`](https://g
 2. Rechercher **3D Printer Maintenance**
 3. **Étape 1 — Identité** : nom, marque, modèle
 4. **Étape 2 — Entités** : sélectionner le capteur HA qui rapporte l'état d'impression et saisir la ou les valeurs « en impression » (séparées par des virgules, ex. `printing`)
+5. **Étape 3 — Compteurs initiaux** *(optionnel)* : pré-renseigner le total d'heures d'impression et de filament déjà consommé (utile lors d'une migration depuis une configuration existante)
 
 > **Exemple K1C + ha_creality_ws**
 > - Entité état : `sensor.k1c_print_status`
@@ -261,6 +265,8 @@ La carte affiche (conçue pour compléter ha_creality_ws, sans duplication) :
 | `printer_maintenance.reset_component` | `component`, `entry_id` *(opt)* | Réinitialise le compteur d'un composant après maintenance |
 | `printer_maintenance.set_interval` | `component`, `interval_hours`, `entry_id` *(opt)* | Modifie l'intervalle de maintenance |
 | `printer_maintenance.add_hours` | `hours`, `component` *(opt)*, `entry_id` *(opt)* | Ajoute des heures d'impression manuellement |
+| `printer_maintenance.set_total_hours` | `hours`, `entry_id` *(opt)* | Définit le compteur global d'heures à une valeur exacte |
+| `printer_maintenance.set_total_filament` | `filament_metres`, `entry_id` *(opt)* | Définit le compteur global de filament à une valeur exacte (mètres) |
 
 ### Logique des statuts
 
