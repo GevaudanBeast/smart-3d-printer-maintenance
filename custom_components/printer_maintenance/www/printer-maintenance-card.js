@@ -314,10 +314,9 @@ class PrinterMaintenanceCard extends HTMLElement {
     });
   }
 
-  getCardSize() { return 9; }
-
-  static getStubConfig() {
-    return { printer: "k1c", title: "K1C Maintenance" };
+  setConfig(config) {
+    if (!config.printer) throw new Error("Veuillez définir 'printer: k1c'");
+    this._config = config;
   }
 }
 
@@ -325,6 +324,7 @@ if (!customElements.get("printer-maintenance-card")) {
   customElements.define("printer-maintenance-card", PrinterMaintenanceCard);
 }
 
+// Ajout pour l'interface visuelle HA
 window.customCards = window.customCards || [];
 window.customCards.push({
   type:        "printer-maintenance-card",
