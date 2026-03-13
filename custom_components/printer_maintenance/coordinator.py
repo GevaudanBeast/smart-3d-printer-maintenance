@@ -17,6 +17,8 @@ from .const import (
     CONF_COMPONENTS,
     CONF_FILAMENT_ENTITY,
     CONF_FAILURE_STATES,
+    CONF_INITIAL_FILAMENT,
+    CONF_INITIAL_HOURS,
     CONF_PAUSED_STATES,
     CONF_PRINTING_STATES,
     CONF_STATUS_ENTITY,
@@ -319,6 +321,11 @@ class PrinterMaintenanceCoordinator:
 
         if old_val is not None and new_val > old_val:
             delta = new_val - old_val
+            unit = (new_state.attributes.get("unit_of_measurement") or "m").lower()
+            if unit == "mm":
+                delta /= 1000.0
+            elif unit == "cm":
+                delta /= 100.0
             self._data["total_filament_m"] = (
                 self._data.get("total_filament_m", 0.0) + delta
             )
@@ -352,9 +359,11 @@ class PrinterMaintenanceCoordinator:
             for comp_id in COMPONENTS:
                 components.setdefault(comp_id, {"hours_used": 0.0, "last_reset": None})
         else:
+            initial_hours = float(self.entry.data.get(CONF_INITIAL_HOURS, 0))
+            initial_filament = float(self.entry.data.get(CONF_INITIAL_FILAMENT, 0))
             self._data = {
-                "total_print_hours": 0.0,
-                "total_filament_m": 0.0,
+                "total_print_hours": initial_hours,
+                "total_filament_m": initial_filament,
                 "total_jobs": 0,
                 "total_jobs_ok": 0,
                 "total_jobs_ko": 0,
@@ -392,6 +401,18 @@ class PrinterMaintenanceCoordinator:
         comp_opts[component_id] = comp_opt
         options[CONF_COMPONENTS] = comp_opts
         self.hass.config_entries.async_update_entry(self.entry, options=options)
+        self._notify_listeners()
+
+    async def async_set_total_hours(self, hours: float) -> None:
+        """Set the global print-hour total without touching component counters."""
+        self._data["total_print_hours"] = hours
+        await self._async_save_data()
+        self._notify_listeners()
+
+    async def async_set_total_filament(self, meters: float) -> None:
+        """Set the global filament total without touching component counters."""
+        self._data["total_filament_m"] = meters
+        await self._async_save_data()
         self._notify_listeners()
 
     async def async_add_hours(

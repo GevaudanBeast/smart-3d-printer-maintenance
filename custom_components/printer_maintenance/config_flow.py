@@ -18,6 +18,8 @@ from .const import (
     COMPONENTS,
     CONF_COMPONENTS,
     CONF_FILAMENT_ENTITY,
+    CONF_INITIAL_FILAMENT,
+    CONF_INITIAL_HOURS,
     CONF_PRINTER_BRAND,
     CONF_PRINTER_MODEL,
     CONF_PRINTER_NAME,
@@ -78,9 +80,7 @@ class PrinterMaintenanceConfigFlow(ConfigFlow, domain=DOMAIN):
             self._data[CONF_PRINTING_STATES] = printing_states
             self._data[CONF_FILAMENT_ENTITY] = user_input.get(CONF_FILAMENT_ENTITY) or None
             self._data[CONF_COMPONENTS] = {}
-
-            title = self._data.get(CONF_PRINTER_NAME, "3D Printer")
-            return self.async_create_entry(title=title, data=self._data)
+            return await self.async_step_initial_counters()
 
         schema = vol.Schema(
             {
@@ -104,6 +104,36 @@ class PrinterMaintenanceConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=schema,
             description_placeholders={"printing_states_hint": "printing, busy, ..."},
         )
+
+    async def async_step_initial_counters(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Step 3: Optional initial counters (total hours & filament)."""
+        if user_input is not None:
+            self._data[CONF_INITIAL_HOURS] = float(user_input.get(CONF_INITIAL_HOURS, 0))
+            self._data[CONF_INITIAL_FILAMENT] = float(user_input.get(CONF_INITIAL_FILAMENT, 0))
+            title = self._data.get(CONF_PRINTER_NAME, "3D Printer")
+            return self.async_create_entry(title=title, data=self._data)
+
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_INITIAL_HOURS, default=0): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0, max=100000, step=0.1,
+                        unit_of_measurement="h",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Optional(CONF_INITIAL_FILAMENT, default=0): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0, max=1000000, step=1,
+                        unit_of_measurement="m",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+            }
+        )
+        return self.async_show_form(step_id="initial_counters", data_schema=schema)
 
     @staticmethod
     @callback

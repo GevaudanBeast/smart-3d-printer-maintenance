@@ -18,6 +18,14 @@
           "printing_states": "Printing state values (comma-separated)",
           "filament_entity": "Filament used entity (optional)"
         }
+      },
+      "initial_counters": {
+        "title": "Initial Counters (optional)",
+        "description": "If your printer already has usage history, enter the current totals here. Leave at 0 to start fresh. Component counters always start at 0.",
+        "data": {
+          "initial_total_hours": "Total print hours already accumulated",
+          "initial_total_filament_m": "Total filament already used (metres)"
+        }
       }
     },
     "error": {

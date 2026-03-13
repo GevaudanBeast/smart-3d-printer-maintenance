@@ -17,6 +17,8 @@ CONF_FAILURE_STATES = "failure_states"
 CONF_SOON_THRESHOLD = "soon_threshold_pct"
 CONF_FILAMENT_ENTITY = "filament_entity"
 CONF_COMPONENTS = "components"
+CONF_INITIAL_HOURS = "initial_total_hours"
+CONF_INITIAL_FILAMENT = "initial_total_filament_m"
 
 # Platforms
 PLATFORMS = ["sensor", "button"]
