@@ -1,4 +1,3 @@
-console.info("Printer Maintenance Card: script start");
 /**
  * Printer Maintenance Card — compact Lovelace card
  * Designed to complement ha_creality_ws (no duplication of print status,
@@ -287,9 +286,6 @@ class PrinterMaintenanceCard extends HTMLElement {
 
 if (!customElements.get("printer-maintenance-card")) {
   customElements.define("printer-maintenance-card", PrinterMaintenanceCard);
-  console.info("Printer Maintenance Card loaded");
-} else {
-  console.warn("Printer Maintenance Card already registered — skipping");
 }
 
 window.customCards = window.customCards || [];

@@ -45,9 +45,4 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
     card_url = f"{_URL_BASE}/{_CARD_FILE}"
     add_extra_js_url(hass, card_url)
     hass.data[_REGISTERED_KEY] = True
-    _LOGGER.warning(
-        "Printer Maintenance Card registered. "
-        "If the card still fails to load, add this URL manually in "
-        "Dashboard > Resources: %s",
-        card_url,
-    )
+    _LOGGER.info("Registered Lovelace card at %s", card_url)
