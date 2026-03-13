@@ -39,8 +39,9 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
             ]
         )
     except Exception as err:  # noqa: BLE001
-        _LOGGER.warning("Could not register static path %s: %s", _URL_BASE, err)
-        return
+        # Path may already be registered (integration reload without HA restart).
+        # The file is still served; just continue to register the frontend URL.
+        _LOGGER.debug("Static path %s already registered: %s", _URL_BASE, err)
 
     card_url = f"{_URL_BASE}/{_CARD_FILE}"
     add_extra_js_url(hass, card_url)
