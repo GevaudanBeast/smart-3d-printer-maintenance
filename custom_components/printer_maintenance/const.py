@@ -13,7 +13,7 @@ CONF_STATUS_ENTITY = "status_entity"
 CONF_PRINTING_STATES = "printing_states"
 CONF_PAUSED_STATES = "paused_states"
 CONF_COMPLETED_STATES = "completed_states"
-CONF_NEUTRAL_STATES = "neutral_states"
+CONF_FAILURE_STATES = "failure_states"
 CONF_FILAMENT_ENTITY = "filament_entity"
 CONF_COMPONENTS = "components"
 
@@ -34,8 +34,8 @@ DEFAULT_PRINTING_STATES = ["printing"]
 DEFAULT_PAUSED_STATES = ["paused", "pause"]
 # States that mean a successful completion → jobs_ok
 DEFAULT_COMPLETED_STATES = ["completed", "complete", "finish"]
-# States that end the session without counting OK or KO (standby / veille)
-DEFAULT_NEUTRAL_STATES = ["idle", "standby"]
+# States that mean an explicit failure → jobs_ko (anything else = ignored)
+DEFAULT_FAILURE_STATES = ["stopped", "error", "cancelled", "failed"]
 
 # Supported printer brands
 PRINTER_BRANDS = [

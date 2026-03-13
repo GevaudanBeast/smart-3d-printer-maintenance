@@ -24,10 +24,10 @@ from .const import (
     CONF_PRINTING_STATES,
     CONF_STATUS_ENTITY,
     CONF_COMPLETED_STATES,
-    CONF_NEUTRAL_STATES,
+    CONF_FAILURE_STATES,
     CONF_PAUSED_STATES,
     DEFAULT_COMPLETED_STATES,
-    DEFAULT_NEUTRAL_STATES,
+    DEFAULT_FAILURE_STATES,
     DEFAULT_PAUSED_STATES,
     DEFAULT_PRINTING_STATES,
     DOMAIN,
@@ -180,11 +180,11 @@ class PrinterMaintenanceOptionsFlow(OptionsFlow):
                     ),
                 ): selector.TextSelector(),
                 vol.Required(
-                    CONF_NEUTRAL_STATES,
+                    CONF_FAILURE_STATES,
                     default=", ".join(
                         self.config_entry.options.get(
-                            CONF_NEUTRAL_STATES,
-                            self.config_entry.data.get(CONF_NEUTRAL_STATES, DEFAULT_NEUTRAL_STATES),
+                            CONF_FAILURE_STATES,
+                            self.config_entry.data.get(CONF_FAILURE_STATES, DEFAULT_FAILURE_STATES),
                         )
                     ),
                 ): selector.TextSelector(),
@@ -209,7 +209,7 @@ class PrinterMaintenanceOptionsFlow(OptionsFlow):
                 self._options[CONF_PRINTING_STATES] = [
                     s.strip() for s in raw.split(",") if s.strip()
                 ]
-            for key in (CONF_PAUSED_STATES, CONF_COMPLETED_STATES, CONF_NEUTRAL_STATES):
+            for key in (CONF_PAUSED_STATES, CONF_COMPLETED_STATES, CONF_FAILURE_STATES):
                 raw_k = self._options.get(key, "")
                 if isinstance(raw_k, str):
                     self._options[key] = [s.strip() for s in raw_k.split(",") if s.strip()]
