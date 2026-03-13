@@ -71,6 +71,29 @@ set_interval:
       selector:
         text:
 
+set_total_hours:
+  name: Set Total Print Hours
+  description: >
+    Set the global print-hour counter of the printer to an exact value,
+    without modifying the individual component counters.
+  fields:
+    hours:
+      name: Hours
+      description: Total print hours to set.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 100000
+          step: 0.1
+          unit_of_measurement: h
+    entry_id:
+      name: Printer (entry ID)
+      description: Config entry ID of the target printer. Leave empty for all.
+      required: false
+      selector:
+        text:
+
 add_hours:
   name: Add Print Hours
   description: >

@@ -394,6 +394,12 @@ class PrinterMaintenanceCoordinator:
         self.hass.config_entries.async_update_entry(self.entry, options=options)
         self._notify_listeners()
 
+    async def async_set_total_hours(self, hours: float) -> None:
+        """Set the global print-hour total without touching component counters."""
+        self._data["total_print_hours"] = hours
+        await self._async_save_data()
+        self._notify_listeners()
+
     async def async_add_hours(
         self, hours: float, component_id: str | None = None
     ) -> None:

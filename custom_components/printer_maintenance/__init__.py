@@ -44,6 +44,13 @@ ADD_HOURS_SCHEMA = vol.Schema(
     }
 )
 
+SET_TOTAL_HOURS_SCHEMA = vol.Schema(
+    {
+        vol.Required("hours"): vol.All(vol.Coerce(float), vol.Range(min=0)),
+        _ENTRY_ID_SCHEMA: cv.string,
+    }
+)
+
 
 def _get_coordinator(
     hass: HomeAssistant, call: ServiceCall
@@ -88,7 +95,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Remove services when no entries remain
     if not hass.data[DOMAIN]:
-        for svc in ("reset_component", "set_interval", "add_hours"):
+        for svc in ("reset_component", "set_interval", "add_hours", "set_total_hours"):
             hass.services.async_remove(DOMAIN, svc)
 
     return unloaded
@@ -119,6 +126,11 @@ def _register_services(hass: HomeAssistant) -> None:
         for coord in _get_coordinator(hass, call):
             await coord.async_add_hours(hours, component)
 
+    async def handle_set_total_hours(call: ServiceCall) -> None:
+        hours = call.data["hours"]
+        for coord in _get_coordinator(hass, call):
+            await coord.async_set_total_hours(hours)
+
     hass.services.async_register(
         DOMAIN, "reset_component", handle_reset_component, schema=RESET_COMPONENT_SCHEMA
     )
@@ -127,4 +139,7 @@ def _register_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(
         DOMAIN, "add_hours", handle_add_hours, schema=ADD_HOURS_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "set_total_hours", handle_set_total_hours, schema=SET_TOTAL_HOURS_SCHEMA
     )
