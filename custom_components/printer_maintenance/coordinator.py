@@ -400,6 +400,12 @@ class PrinterMaintenanceCoordinator:
         await self._async_save_data()
         self._notify_listeners()
 
+    async def async_set_total_filament(self, meters: float) -> None:
+        """Set the global filament total without touching component counters."""
+        self._data["total_filament_m"] = meters
+        await self._async_save_data()
+        self._notify_listeners()
+
     async def async_add_hours(
         self, hours: float, component_id: str | None = None
     ) -> None:

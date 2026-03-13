@@ -71,6 +71,29 @@ set_interval:
       selector:
         text:
 
+set_total_filament:
+  name: Set Total Filament Used
+  description: >
+    Set the global filament counter to an exact value (in metres),
+    without modifying the individual component counters.
+  fields:
+    meters:
+      name: Meters
+      description: Total filament used to set (in metres).
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          step: 1
+          unit_of_measurement: m
+    entry_id:
+      name: Printer (entry ID)
+      description: Config entry ID of the target printer. Leave empty for all.
+      required: false
+      selector:
+        text:
+
 set_total_hours:
   name: Set Total Print Hours
   description: >

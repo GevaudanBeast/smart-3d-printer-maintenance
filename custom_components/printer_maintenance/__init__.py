@@ -51,6 +51,13 @@ SET_TOTAL_HOURS_SCHEMA = vol.Schema(
     }
 )
 
+SET_TOTAL_FILAMENT_SCHEMA = vol.Schema(
+    {
+        vol.Required("meters"): vol.All(vol.Coerce(float), vol.Range(min=0)),
+        _ENTRY_ID_SCHEMA: cv.string,
+    }
+)
+
 
 def _get_coordinator(
     hass: HomeAssistant, call: ServiceCall
@@ -95,7 +102,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Remove services when no entries remain
     if not hass.data[DOMAIN]:
-        for svc in ("reset_component", "set_interval", "add_hours", "set_total_hours"):
+        for svc in ("reset_component", "set_interval", "add_hours", "set_total_hours", "set_total_filament"):
             hass.services.async_remove(DOMAIN, svc)
 
     return unloaded
@@ -131,6 +138,11 @@ def _register_services(hass: HomeAssistant) -> None:
         for coord in _get_coordinator(hass, call):
             await coord.async_set_total_hours(hours)
 
+    async def handle_set_total_filament(call: ServiceCall) -> None:
+        meters = call.data["meters"]
+        for coord in _get_coordinator(hass, call):
+            await coord.async_set_total_filament(meters)
+
     hass.services.async_register(
         DOMAIN, "reset_component", handle_reset_component, schema=RESET_COMPONENT_SCHEMA
     )
@@ -142,4 +154,7 @@ def _register_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(
         DOMAIN, "set_total_hours", handle_set_total_hours, schema=SET_TOTAL_HOURS_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "set_total_filament", handle_set_total_filament, schema=SET_TOTAL_FILAMENT_SCHEMA
     )
