@@ -321,6 +321,11 @@ class PrinterMaintenanceCoordinator:
 
         if old_val is not None and new_val > old_val:
             delta = new_val - old_val
+            unit = (new_state.attributes.get("unit_of_measurement") or "m").lower()
+            if unit == "mm":
+                delta /= 1000.0
+            elif unit == "cm":
+                delta /= 100.0
             self._data["total_filament_m"] = (
                 self._data.get("total_filament_m", 0.0) + delta
             )
