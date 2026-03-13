@@ -53,6 +53,8 @@ class PrinterMaintenanceCoordinator:
         self._print_start_time: datetime | None = None
         # Hours accumulated in previous segments of the same session (across pauses)
         self._session_hours: float = 0.0
+        # Last known filament entity value (for delta computation)
+        self._last_filament_value: float | None = None
         self._unsubscribers: list[Any] = []
         self.listeners: list[Any] = []
 
@@ -159,6 +161,20 @@ class PrinterMaintenanceCoordinator:
                 self.hass, [self.status_entity], self._handle_status_change
             )
         )
+
+        # Subscribe to filament entity for incremental tracking
+        if self.filament_entity:
+            self._unsubscribers.append(
+                async_track_state_change_event(
+                    self.hass, [self.filament_entity], self._handle_filament_change
+                )
+            )
+            fil_state = self.hass.states.get(self.filament_entity)
+            if fil_state and fil_state.state not in ("unknown", "unavailable"):
+                try:
+                    self._last_filament_value = float(fil_state.state)
+                except ValueError:
+                    pass
 
         # Restore in-progress session after HA restart
         current = self.hass.states.get(self.status_entity)
@@ -267,6 +283,34 @@ class PrinterMaintenanceCoordinator:
             self.hass.async_create_task(self._async_save_data())
 
         self._notify_listeners()
+
+    @callback
+    def _handle_filament_change(self, event: Any) -> None:
+        """Accumulate filament consumption in real time during active printing."""
+        new_state = event.data.get("new_state")
+        if new_state is None or new_state.state in ("unknown", "unavailable"):
+            return
+
+        try:
+            new_val = float(new_state.state)
+        except ValueError:
+            return
+
+        old_val = self._last_filament_value
+        self._last_filament_value = new_val
+
+        # Only accumulate while actively printing (not paused, not idle)
+        if not self.is_currently_printing:
+            return
+
+        if old_val is not None and new_val > old_val:
+            delta = new_val - old_val
+            self._data["total_filament_m"] = (
+                self._data.get("total_filament_m", 0.0) + delta
+            )
+            _LOGGER.debug("Filament +%.2f m (total %.2f m)", delta, self._data["total_filament_m"])
+            self.hass.async_create_task(self._async_save_data())
+            self._notify_listeners()
 
     # ------------------------------------------------------------------
     # Internal helpers

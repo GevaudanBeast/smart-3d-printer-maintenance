@@ -247,7 +247,7 @@ class ComponentStatusSensor(_BaseComponentSensor):
 
 class TotalJobsOkSensor(_BaseMaintenanceSensor):
     _attr_icon = "mdi:check-circle-outline"
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: PrinterMaintenanceCoordinator, printer_name: str, unique_prefix: str) -> None:
         super().__init__(coordinator, printer_name, unique_prefix)
@@ -262,7 +262,7 @@ class TotalJobsOkSensor(_BaseMaintenanceSensor):
 
 class TotalJobsKoSensor(_BaseMaintenanceSensor):
     _attr_icon = "mdi:close-circle-outline"
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: PrinterMaintenanceCoordinator, printer_name: str, unique_prefix: str) -> None:
         super().__init__(coordinator, printer_name, unique_prefix)
