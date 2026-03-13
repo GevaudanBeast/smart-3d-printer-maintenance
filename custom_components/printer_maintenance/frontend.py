@@ -1,6 +1,7 @@
 """Register the Lovelace custom card with Home Assistant's frontend."""
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -13,6 +14,13 @@ _LOGGER = logging.getLogger(__name__)
 _URL_BASE = "/printer_maintenance"
 _CARD_FILE = "printer-maintenance-card.js"
 _REGISTERED_KEY = "printer_maintenance_frontend_registered"
+
+def _get_version() -> str:
+    manifest = Path(__file__).parent / "manifest.json"
+    try:
+        return json.loads(manifest.read_text())["version"]
+    except Exception:
+        return "0"
 
 
 async def async_register_frontend(hass: HomeAssistant) -> None:
@@ -43,7 +51,7 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
         # The file is still served; just continue to register the frontend URL.
         _LOGGER.debug("Static path %s already registered: %s", _URL_BASE, err)
 
-    card_url = f"{_URL_BASE}/{_CARD_FILE}"
+    card_url = f"{_URL_BASE}/{_CARD_FILE}?v={_get_version()}"
     add_extra_js_url(hass, card_url)
     hass.data[_REGISTERED_KEY] = True
     _LOGGER.info("Registered Lovelace card at %s", card_url)
