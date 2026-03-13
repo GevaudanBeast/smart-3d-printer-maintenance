@@ -18,6 +18,14 @@
           "printing_states": "Valeurs d'état « en impression » (séparées par des virgules)",
           "filament_entity": "Entité filament utilisé (optionnel)"
         }
+      },
+      "initial_counters": {
+        "title": "Compteurs initiaux (optionnel)",
+        "description": "Si votre imprimante a déjà un historique d'utilisation, entrez les totaux actuels ici. Laissez à 0 pour démarrer de zéro. Les compteurs par composant démarrent toujours à 0.",
+        "data": {
+          "initial_total_hours": "Heures d'impression déjà accumulées",
+          "initial_total_filament_m": "Filament déjà utilisé (mètres)"
+        }
       }
     },
     "error": {

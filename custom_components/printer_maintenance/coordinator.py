@@ -17,6 +17,8 @@ from .const import (
     CONF_COMPONENTS,
     CONF_FILAMENT_ENTITY,
     CONF_FAILURE_STATES,
+    CONF_INITIAL_FILAMENT,
+    CONF_INITIAL_HOURS,
     CONF_PAUSED_STATES,
     CONF_PRINTING_STATES,
     CONF_STATUS_ENTITY,
@@ -352,9 +354,11 @@ class PrinterMaintenanceCoordinator:
             for comp_id in COMPONENTS:
                 components.setdefault(comp_id, {"hours_used": 0.0, "last_reset": None})
         else:
+            initial_hours = float(self.entry.data.get(CONF_INITIAL_HOURS, 0))
+            initial_filament = float(self.entry.data.get(CONF_INITIAL_FILAMENT, 0))
             self._data = {
-                "total_print_hours": 0.0,
-                "total_filament_m": 0.0,
+                "total_print_hours": initial_hours,
+                "total_filament_m": initial_filament,
                 "total_jobs": 0,
                 "total_jobs_ok": 0,
                 "total_jobs_ko": 0,
