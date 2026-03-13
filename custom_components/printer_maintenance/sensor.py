@@ -1,7 +1,6 @@
 """Sensor entities for 3D Printer Maintenance integration."""
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -24,8 +23,6 @@ from .const import (
     STATUS_SOON,
 )
 from .coordinator import PrinterMaintenanceCoordinator
-
-_LOGGER = logging.getLogger(__name__)
 
 STATUS_ICON = {
     STATUS_OK: "mdi:check-circle",

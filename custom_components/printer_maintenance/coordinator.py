@@ -24,8 +24,9 @@ from .const import (
     DEFAULT_FAILURE_STATES,
     DEFAULT_PAUSED_STATES,
     DEFAULT_PRINTING_STATES,
+    CONF_SOON_THRESHOLD,
+    DEFAULT_SOON_THRESHOLD,
     DOMAIN,
-    SOON_THRESHOLD_PCT,
     STATUS_DUE,
     STATUS_OK,
     STATUS_OVERDUE,
@@ -39,6 +40,11 @@ _LOGGER = logging.getLogger(__name__)
 # Minimum session duration to be counted as a real job (avoids false counts
 # from brief status flickers or accidental cancellations).
 _MIN_JOB_HOURS = 1 / 60  # 1 minute
+
+# Minimum filament delta (m) before persisting to storage — avoids hammering
+# disk on every sensor tick. In-memory value and listener notifications are
+# still updated on every change for real-time display.
+_MIN_FILAMENT_SAVE_M = 0.05
 
 
 class PrinterMaintenanceCoordinator:
@@ -55,6 +61,8 @@ class PrinterMaintenanceCoordinator:
         self._session_hours: float = 0.0
         # Last known filament entity value (for delta computation)
         self._last_filament_value: float | None = None
+        # Filament accumulated since last disk save (throttle I/O)
+        self._filament_unsaved_m: float = 0.0
         self._unsubscribers: list[Any] = []
         self.listeners: list[Any] = []
 
@@ -84,6 +92,11 @@ class PrinterMaintenanceCoordinator:
     @property
     def failure_states(self) -> list[str]:
         return self._opt(CONF_FAILURE_STATES, DEFAULT_FAILURE_STATES)
+
+    @property
+    def soon_threshold_pct(self) -> float:
+        """Return the 'soon' alert threshold as a fraction (e.g. 0.20 for 20%)."""
+        return self._opt(CONF_SOON_THRESHOLD, DEFAULT_SOON_THRESHOLD) / 100
 
     @property
     def filament_entity(self) -> str | None:
@@ -132,7 +145,7 @@ class PrinterMaintenanceCoordinator:
             status = STATUS_OVERDUE
         elif hours_used >= interval:
             status = STATUS_DUE
-        elif remaining <= interval * SOON_THRESHOLD_PCT:
+        elif remaining <= interval * self.soon_threshold_pct:
             status = STATUS_SOON
         else:
             status = STATUS_OK
@@ -198,10 +211,11 @@ class PrinterMaintenanceCoordinator:
             _LOGGER.debug("Restored paused session (%.2f h so far)", self._session_hours)
 
     async def async_shutdown(self) -> None:
-        """Unsubscribe and persist state."""
+        """Unsubscribe and persist state (flush any pending filament data)."""
         for unsub in self._unsubscribers:
             unsub()
         self._unsubscribers.clear()
+        self._filament_unsaved_m = 0.0  # clear counter before final save
         await self._async_save_data()
 
     # ------------------------------------------------------------------
@@ -308,8 +322,12 @@ class PrinterMaintenanceCoordinator:
             self._data["total_filament_m"] = (
                 self._data.get("total_filament_m", 0.0) + delta
             )
+            self._filament_unsaved_m += delta
             _LOGGER.debug("Filament +%.2f m (total %.2f m)", delta, self._data["total_filament_m"])
-            self.hass.async_create_task(self._async_save_data())
+            # Persist only when unsaved accumulation crosses the threshold
+            if self._filament_unsaved_m >= _MIN_FILAMENT_SAVE_M:
+                self._filament_unsaved_m = 0.0
+                self.hass.async_create_task(self._async_save_data())
             self._notify_listeners()
 
     # ------------------------------------------------------------------

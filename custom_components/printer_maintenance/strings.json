@@ -36,6 +36,7 @@
           "paused_states": "Paused states (comma-separated, e.g. paused, pause)",
           "completed_states": "Completed states → job OK (e.g. completed, finish)",
           "failure_states": "Failure states → job KO (e.g. stopped, error, cancelled)",
+          "soon_threshold_pct": "\"Soon\" alert threshold (% of interval remaining)",
           "filament_entity": "Filament used entity (optional)"
         }
       },

@@ -26,10 +26,12 @@ from .const import (
     CONF_COMPLETED_STATES,
     CONF_FAILURE_STATES,
     CONF_PAUSED_STATES,
+    CONF_SOON_THRESHOLD,
     DEFAULT_COMPLETED_STATES,
     DEFAULT_FAILURE_STATES,
     DEFAULT_PAUSED_STATES,
     DEFAULT_PRINTING_STATES,
+    DEFAULT_SOON_THRESHOLD,
     DOMAIN,
     PRINTER_BRANDS,
 )
@@ -188,6 +190,23 @@ class PrinterMaintenanceOptionsFlow(OptionsFlow):
                         )
                     ),
                 ): selector.TextSelector(),
+                vol.Required(
+                    CONF_SOON_THRESHOLD,
+                    default=int(
+                        self.config_entry.options.get(
+                            CONF_SOON_THRESHOLD,
+                            self.config_entry.data.get(CONF_SOON_THRESHOLD, DEFAULT_SOON_THRESHOLD),
+                        )
+                    ),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=5,
+                        max=50,
+                        step=5,
+                        unit_of_measurement="%",
+                        mode=selector.NumberSelectorMode.SLIDER,
+                    )
+                ),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

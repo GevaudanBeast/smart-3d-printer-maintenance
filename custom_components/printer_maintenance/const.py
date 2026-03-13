@@ -14,6 +14,7 @@ CONF_PRINTING_STATES = "printing_states"
 CONF_PAUSED_STATES = "paused_states"
 CONF_COMPLETED_STATES = "completed_states"
 CONF_FAILURE_STATES = "failure_states"
+CONF_SOON_THRESHOLD = "soon_threshold_pct"
 CONF_FILAMENT_ENTITY = "filament_entity"
 CONF_COMPONENTS = "components"
 
@@ -26,8 +27,9 @@ STATUS_SOON = "soon"
 STATUS_DUE = "due"
 STATUS_OVERDUE = "overdue"
 
-# Alert when remaining life < 20% of interval
+# Default: alert when remaining life < 20% of interval (configurable, stored as %)
 SOON_THRESHOLD_PCT = 0.20
+DEFAULT_SOON_THRESHOLD = 20  # percent
 
 DEFAULT_PRINTING_STATES = ["printing"]
 # States where the session is paused but NOT ended (time stops, no job count yet)

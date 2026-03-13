@@ -36,6 +36,7 @@
           "paused_states": "États en pause (ex. paused, pause)",
           "completed_states": "États de fin réussie → job OK (ex. completed, finish)",
           "failure_states": "États d'échec → job KO (ex. stopped, error, cancelled)",
+          "soon_threshold_pct": "Seuil d'alerte « bientôt » (% de vie restante)",
           "filament_entity": "Entité filament utilisé (optionnel)"
         }
       },
