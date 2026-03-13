@@ -16,10 +16,12 @@ from .const import (
     CONF_COMPLETED_STATES,
     CONF_COMPONENTS,
     CONF_FILAMENT_ENTITY,
+    CONF_NEUTRAL_STATES,
     CONF_PAUSED_STATES,
     CONF_PRINTING_STATES,
     CONF_STATUS_ENTITY,
     DEFAULT_COMPLETED_STATES,
+    DEFAULT_NEUTRAL_STATES,
     DEFAULT_PAUSED_STATES,
     DEFAULT_PRINTING_STATES,
     DOMAIN,
@@ -76,6 +78,10 @@ class PrinterMaintenanceCoordinator:
     @property
     def completed_states(self) -> list[str]:
         return self._opt(CONF_COMPLETED_STATES, DEFAULT_COMPLETED_STATES)
+
+    @property
+    def neutral_states(self) -> list[str]:
+        return self._opt(CONF_NEUTRAL_STATES, DEFAULT_NEUTRAL_STATES)
 
     @property
     def filament_entity(self) -> str | None:
@@ -239,11 +245,18 @@ class PrinterMaintenanceCoordinator:
                 self._apply_print_hours(total)
                 if new in self.completed_states:
                     self._data["total_jobs_ok"] = self._data.get("total_jobs_ok", 0) + 1
+                    self._data["total_jobs"] = self._data.get("total_jobs", 0) + 1
                     _LOGGER.debug("Job OK — %.2f h added", total)
+                elif new in self.neutral_states:
+                    # Neutral/standby state: hours counted but job not flagged OK or KO
+                    _LOGGER.debug(
+                        "Session ended in neutral state '%s' — %.2f h added, no job counted",
+                        new, total,
+                    )
                 else:
                     self._data["total_jobs_ko"] = self._data.get("total_jobs_ko", 0) + 1
+                    self._data["total_jobs"] = self._data.get("total_jobs", 0) + 1
                     _LOGGER.debug("Job KO (%s) — %.2f h added", new, total)
-                self._data["total_jobs"] = self._data.get("total_jobs", 0) + 1
             else:
                 _LOGGER.debug(
                     "Session too short (%.1f s) — not counted", total * 3600
