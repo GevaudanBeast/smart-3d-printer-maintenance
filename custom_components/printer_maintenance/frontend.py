@@ -21,7 +21,8 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
     if hass.data.get(_REGISTERED_KEY):
         return
 
-    card_path = Path(__file__).parent / "www" / _CARD_FILE
+    www_path = Path(__file__).parent / "www"
+    card_path = www_path / _CARD_FILE
 
     if not card_path.exists():
         _LOGGER.warning("Lovelace card not found at %s — skipping registration", card_path)
@@ -30,8 +31,8 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
     await hass.http.async_register_static_paths(
         [
             StaticPathConfig(
-                url_path=f"{_URL_BASE}/{_CARD_FILE}",
-                path=str(card_path),
+                url_path=_URL_BASE,
+                path=str(www_path),
                 cache_headers=False,
             )
         ]
@@ -39,4 +40,4 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
 
     add_extra_js_url(hass, f"{_URL_BASE}/{_CARD_FILE}")
     hass.data[_REGISTERED_KEY] = True
-    _LOGGER.debug("Registered Lovelace card at %s/%s", _URL_BASE, _CARD_FILE)
+    _LOGGER.info("Registered Lovelace card at %s/%s", _URL_BASE, _CARD_FILE)
