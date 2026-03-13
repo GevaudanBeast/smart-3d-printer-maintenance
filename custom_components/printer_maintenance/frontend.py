@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
-_URL_BASE = "/hacsfiles/printer_maintenance"
+_URL_BASE = "/printer_maintenance"
 _CARD_FILE = "printer-maintenance-card.js"
 _REGISTERED_KEY = "printer_maintenance_frontend_registered"
 
