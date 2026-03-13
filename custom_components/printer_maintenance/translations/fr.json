@@ -29,9 +29,13 @@
     "step": {
       "init": {
         "title": "Entités & Paramètres",
+        "description": "Les champs d'états acceptent des valeurs séparées par des virgules. Tout état absent des listes « terminé » ou « échec » ferme la session sans comptabiliser de job.",
         "data": {
           "status_entity": "Entité état d'impression",
-          "printing_states": "Valeurs d'état « en impression » (séparées par des virgules)",
+          "printing_states": "États en cours d'impression (ex. printing)",
+          "paused_states": "États en pause (ex. paused, pause)",
+          "completed_states": "États de fin réussie → job OK (ex. completed, finish)",
+          "failure_states": "États d'échec → job KO (ex. stopped, error, cancelled)",
           "filament_entity": "Entité filament utilisé (optionnel)"
         }
       },

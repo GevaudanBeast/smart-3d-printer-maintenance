@@ -29,9 +29,13 @@
     "step": {
       "init": {
         "title": "Entities & Settings",
+        "description": "State fields accept comma-separated values. Anything not listed in completed or failure states closes the session without counting a job.",
         "data": {
           "status_entity": "Print status entity",
-          "printing_states": "Printing state values (comma-separated)",
+          "printing_states": "Printing states (comma-separated, e.g. printing)",
+          "paused_states": "Paused states (comma-separated, e.g. paused, pause)",
+          "completed_states": "Completed states → job OK (e.g. completed, finish)",
+          "failure_states": "Failure states → job KO (e.g. stopped, error, cancelled)",
           "filament_entity": "Filament used entity (optional)"
         }
       },
