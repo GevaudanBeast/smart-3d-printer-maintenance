@@ -12,10 +12,15 @@ _LOGGER = logging.getLogger(__name__)
 
 _URL_BASE = "/printer_maintenance"
 _CARD_FILE = "printer-maintenance-card.js"
+_REGISTERED_KEY = "printer_maintenance_frontend_registered"
 
 
 async def async_register_frontend(hass: HomeAssistant) -> None:
     """Serve the card JS file and tell the frontend to load it."""
+    # Guard against double registration on config entry reload
+    if hass.data.get(_REGISTERED_KEY):
+        return
+
     card_path = Path(__file__).parent / "www" / _CARD_FILE
 
     if not card_path.exists():
@@ -33,4 +38,5 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
     )
 
     add_extra_js_url(hass, f"{_URL_BASE}/{_CARD_FILE}")
+    hass.data[_REGISTERED_KEY] = True
     _LOGGER.debug("Registered Lovelace card at %s/%s", _URL_BASE, _CARD_FILE)

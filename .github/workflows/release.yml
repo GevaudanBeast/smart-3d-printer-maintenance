@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    name: Build & publish release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version from manifest
+        id: version
+        run: |
+          VERSION=$(python3 -c "import json; print(json.load(open('custom_components/printer_maintenance/manifest.json'))['version'])")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Build package
+        run: |
+          chmod +x scripts/package.sh
+          ./scripts/package.sh "${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "v${{ steps.version.outputs.version }}"
+          generate_release_notes: true
+          files: dist/printer_maintenance-${{ steps.version.outputs.version }}.zip
