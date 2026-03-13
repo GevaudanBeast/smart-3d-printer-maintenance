@@ -323,6 +323,9 @@ class PrinterMaintenanceCard extends HTMLElement {
 
 if (!customElements.get("printer-maintenance-card")) {
   customElements.define("printer-maintenance-card", PrinterMaintenanceCard);
+  console.info("✅ Printer Maintenance Card loaded");
+} else {
+  console.warn("⚠️ Printer Maintenance Card already registered");
 }
 
 window.customCards = window.customCards || [];
