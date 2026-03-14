@@ -465,6 +465,8 @@ class SpoolRemainingWeightSensor(_BaseSpoolSensor):
             "color": d["color"],
             "initial_weight_g": d["initial_weight_g"],
             "remaining_pct": d["remaining_pct"],
+            "remaining_length_m": d["remaining_length_m"],
+            "initial_length_m": d["initial_length_m"],
             "diameter_mm": d["diameter_mm"],
             "active": d["active"],
         }
@@ -516,8 +518,33 @@ class ActiveSpoolSensor(_BaseMaintenanceSensor):
         return {}
 
 
+class SpoolRemainingLengthSensor(_BaseSpoolSensor):
+    _attr_native_unit_of_measurement = "m"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:tape-measure"
+
+    def __init__(self, coordinator, printer_name, unique_prefix, spool_id):
+        super().__init__(coordinator, printer_name, unique_prefix, spool_id)
+        self._attr_unique_id = f"{unique_prefix}_spool_{spool_id}_remaining_length"
+        self._attr_name = f"Spool {self._coordinator.get_spool_data(spool_id)['name']} Remaining Length"
+
+    @property
+    def native_value(self):
+        return self._spool()["remaining_length_m"]
+
+    @property
+    def extra_state_attributes(self):
+        d = self._spool()
+        return {
+            "initial_length_m": d["initial_length_m"],
+            "material": d["material"],
+            "diameter_mm": d["diameter_mm"],
+        }
+
+
 def make_spool_sensors(coordinator, printer_name, unique_prefix, spool_id):
     return [
         SpoolRemainingWeightSensor(coordinator, printer_name, unique_prefix, spool_id),
         SpoolRemainingPctSensor(coordinator, printer_name, unique_prefix, spool_id),
+        SpoolRemainingLengthSensor(coordinator, printer_name, unique_prefix, spool_id),
     ]

@@ -672,15 +672,25 @@ class PrinterMaintenanceCoordinator:
         initial = s.get("initial_weight_g", 1000.0)
         remaining = s.get("remaining_weight_g", initial)
         pct = round(remaining / initial * 100, 1) if initial > 0 else 0.0
+        material = s.get("material", "PLA")
+        diameter_mm = s.get("diameter_mm", DEFAULT_FILAMENT_DIAMETER_MM)
+        density = MATERIAL_DENSITIES.get(material, MATERIAL_DENSITIES["Other"])
+        radius_cm = (diameter_mm / 2.0) / 10.0
+        volume_per_m = math.pi * radius_cm ** 2 * 100.0
+        grams_per_m = volume_per_m * density
+        remaining_length_m = round(remaining / grams_per_m, 1) if grams_per_m > 0 else 0.0
+        initial_length_m = round(initial / grams_per_m, 1) if grams_per_m > 0 else 0.0
         return {
             "name": s.get("name", spool_id),
-            "material": s.get("material", "PLA"),
+            "material": material,
             "color": s.get("color", ""),
             "brand": s.get("brand", ""),
             "initial_weight_g": round(initial, 0),
             "remaining_weight_g": round(remaining, 1),
             "remaining_pct": pct,
-            "diameter_mm": s.get("diameter_mm", DEFAULT_FILAMENT_DIAMETER_MM),
+            "diameter_mm": diameter_mm,
+            "remaining_length_m": remaining_length_m,
+            "initial_length_m": initial_length_m,
             "active": s.get("active", False),
         }
 
