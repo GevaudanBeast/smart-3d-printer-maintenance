@@ -20,11 +20,14 @@ Designed first for the **Creality K1C** (with [`ha_creality_ws`](https://github.
 - **Job counting (OK / KO)** — per configurable state lists; ambiguous states (idle, standby) are ignored
 - **11 tracked components** with individually configurable maintenance intervals
 - **4 maintenance statuses**: `OK` · `Soon` · `Due` · `Overdue` (configurable alert threshold)
-- **Automatic HA persistent notifications** — fired when a component reaches `Due` or `Overdue`, dismissed automatically on reset
-- **49 sensors** (global stats + per-component hours used / remaining / status / last maintenance date)
-- **11 reset buttons** (one per component, configurable category)
-- **5 services**: reset a counter, set an interval, add hours, set total hours, set total filament
-- **Compact Lovelace card** — auto-registered, no manual resource setup, shows last maintenance date per component
+- **Automatic HA persistent notifications** — fired when a component or plate reaches `Due` or `Overdue`, dismissed on reset
+- **Multi build-plate management** — unlimited plates (PEI smooth, PEI textured, PLA sheet…), only the active plate accumulates hours, per-plate status + last maintenance date + HA notifications
+- **Filament spool management** — track spools by material, brand, colour and weight; active spool weight auto-decrements from the filament sensor (g/m calculated from material density + diameter)
+- **51+ sensors** — 5 global + 44 per-component + 2 active-plate/spool indicators, then +4 per plate and +2 per spool added dynamically (no restart required)
+- **Dynamic entities** — adding or removing a plate/spool registers/removes its sensors and buttons instantly
+- **11+ reset & control buttons** — 1 reset per component + 2 per plate (reset / activate) + 1 per spool (activate)
+- **13 services** — component counters, intervals, hours, filament, plates and spools
+- **Compact Lovelace card** — auto-registered, shows last maintenance date, plates section and spools section
 - **Persistent storage** — survives HA restarts, resumes in-progress sessions
 - **Multi-printer** — one integration entry per printer
 - **FR / EN translations**
@@ -104,24 +107,52 @@ The card is automatically available after installation. Add it to any dashboard:
 
 ```yaml
 type: custom:printer-maintenance-card
-printer: k1c              # slugified printer name (lowercase, spaces → _)
-title: "K1C Maintenance"  # optional
+printer: k1c                    # slugified printer name (lowercase, spaces → _)
+title: "K1C Maintenance"        # optional
+status_entity: sensor.k1c_print_status  # optional — status pill in header
+plates:                         # optional — list of plate IDs to display
+  - pei_smooth
+  - pei_textured
+spools:                         # optional — list of spool IDs to display
+  - pla_white
+  - petg_black
 ```
 
-The card displays (designed to complement ha_creality_ws, no duplication):
+The card displays:
 - Global stats: total print hours · filament used · jobs count
 - Per-component: progress bar, hours used / interval, status badge, **last maintenance date**
-- Inline reset button per component (appears on hover)
+- **Plates section**: active indicator (★), hours bar, status badge, last maintenance date, reset + activate buttons
+- **Spools section**: active indicator (★), colour dot, material badge, remaining weight bar, % remaining, activate button
 
 ### Services
+
+**Components**
 
 | Service | Parameters | Description |
 |---------|-----------|-------------|
 | `printer_maintenance.reset_component` | `component`, `entry_id` *(opt)* | Reset a component counter after maintenance |
 | `printer_maintenance.set_interval` | `component`, `interval_hours`, `entry_id` *(opt)* | Update a maintenance interval |
 | `printer_maintenance.add_hours` | `hours`, `component` *(opt)*, `entry_id` *(opt)* | Manually add print hours |
-| `printer_maintenance.set_total_hours` | `hours`, `entry_id` *(opt)* | Set the global print-hour total without touching component counters |
-| `printer_maintenance.set_total_filament` | `meters`, `entry_id` *(opt)* | Set the global filament total without touching component counters |
+| `printer_maintenance.set_total_hours` | `hours`, `entry_id` *(opt)* | Set the global print-hour total |
+| `printer_maintenance.set_total_filament` | `meters`, `entry_id` *(opt)* | Set the global filament total |
+
+**Build plates**
+
+| Service | Parameters | Description |
+|---------|-----------|-------------|
+| `printer_maintenance.add_plate` | `name`, `interval_hours` *(opt, default 200)*, `entry_id` *(opt)* | Add a new build plate |
+| `printer_maintenance.remove_plate` | `plate_id`, `entry_id` *(opt)* | Remove a plate and its entities |
+| `printer_maintenance.set_active_plate` | `plate_id`, `entry_id` *(opt)* | Switch the active plate (only active plate accumulates hours) |
+| `printer_maintenance.reset_plate` | `plate_id`, `entry_id` *(opt)* | Reset a plate counter after cleaning |
+
+**Filament spools**
+
+| Service | Parameters | Description |
+|---------|-----------|-------------|
+| `printer_maintenance.add_spool` | `name`, `material` *(opt)*, `brand` *(opt)*, `color` *(opt)*, `initial_weight_g` *(opt, default 1000)*, `diameter_mm` *(opt, default 1.75)*, `entry_id` *(opt)* | Add a new spool |
+| `printer_maintenance.remove_spool` | `spool_id`, `entry_id` *(opt)* | Remove a spool and its entities |
+| `printer_maintenance.set_active_spool` | `spool_id`, `entry_id` *(opt)* | Switch the active spool (only active spool decrements) |
+| `printer_maintenance.update_spool_weight` | `spool_id`, `remaining_weight_g`, `entry_id` *(opt)* | Manually correct remaining weight |
 
 ### Status Logic
 
@@ -144,8 +175,9 @@ The threshold is configurable per integration entry (Options → "Soon" alert th
 - [ ] Lovelace card visual editor (GUI config)
 - [ ] Maintenance history log
 - [x] Automatic HA notifications on status change
+- [x] Multi build-plate management (per-plate hours, status, last maintenance)
+- [x] Filament spool management (material, brand, weight auto-decrement)
 - [ ] Per-component greasing tracking: dedicated greasing date + configurable greasing interval (separate from the general maintenance interval)
-- [ ] Filament spool management (brand, material, weight, stock)
 - [ ] OctoPrint / Moonraker / Klipper connectors
 
 ---
@@ -166,11 +198,14 @@ Conçue en priorité pour la **Creality K1C** (avec [`ha_creality_ws`](https://g
 - **Comptage des jobs (OK / KO)** — basé sur des listes d'états configurables ; les états ambigus (idle, standby) sont ignorés
 - **11 composants suivis** avec intervalles de maintenance individuellement configurables
 - **4 statuts de maintenance** : `OK` · `Bientôt` · `Requis` · `En retard` (seuil d'alerte configurable)
-- **Notifications HA persistantes automatiques** — déclenchées quand un composant passe en `Requis` ou `En retard`, supprimées automatiquement à la réinitialisation
-- **49 capteurs** (statistiques globales + heures utilisées / restantes / statut / date dernier entretien par composant)
-- **11 boutons de réinitialisation** (un par composant)
-- **5 services** : réinitialiser un compteur, définir un intervalle, ajouter des heures, définir le total d'heures, définir le total de filament
-- **Carte Lovelace compacte** — enregistrée automatiquement, affiche la date de dernier entretien par composant
+- **Notifications HA persistantes automatiques** — déclenchées quand un composant ou un plateau passe en `Requis` ou `En retard`, supprimées à la réinitialisation
+- **Gestion multi-plateaux** — plateaux illimités (PEI lisse, PEI texturé, feuille PLA…), seul le plateau actif accumule les heures, statut + date d'entretien + notifications par plateau
+- **Gestion des bobines de filament** — suivi par matière, marque, couleur et poids ; le poids du spool actif se décrémente automatiquement depuis le capteur filament (g/m calculé selon densité matière + diamètre)
+- **51+ capteurs** — 5 globaux + 44 par composant + 2 indicateurs plateau/spool actifs, puis +4 par plateau et +2 par bobine ajoutés dynamiquement (sans redémarrage)
+- **Entités dynamiques** — l'ajout ou la suppression d'un plateau/bobine enregistre/supprime ses entités instantanément
+- **11+ boutons** — 1 reset par composant + 2 par plateau (reset / activer) + 1 par bobine (activer)
+- **13 services** — compteurs composants, intervalles, heures, filament, plateaux et bobines
+- **Carte Lovelace compacte** — enregistrée automatiquement, date d'entretien, section plateaux et section bobines
 - **Stockage persistant** — résiste aux redémarrages HA, reprend les sessions en cours
 - **Multi-imprimantes** — une entrée d'intégration par imprimante
 - **Traductions FR / EN**
@@ -250,24 +285,52 @@ La carte est disponible automatiquement après installation. Ajoutez-la à n'imp
 
 ```yaml
 type: custom:printer-maintenance-card
-printer: k1c              # nom en minuscules (espaces → _)
-title: "K1C Maintenance"  # optionnel
+printer: k1c                    # nom en minuscules (espaces → _)
+title: "K1C Maintenance"        # optionnel
+status_entity: sensor.k1c_print_status  # optionnel — pilule d'état dans l'en-tête
+plates:                         # optionnel — liste des IDs de plateaux à afficher
+  - pei_smooth
+  - pei_textured
+spools:                         # optionnel — liste des IDs de bobines à afficher
+  - pla_white
+  - petg_black
 ```
 
-La carte affiche (conçue pour compléter ha_creality_ws, sans duplication) :
+La carte affiche :
 - Statistiques globales : heures totales · filament utilisé · nombre de jobs
 - Par composant : barre de progression, heures utilisées / intervalle, badge de statut, **date du dernier entretien**
-- Bouton de réinitialisation par composant (visible au survol)
+- **Section plateaux** : indicateur actif (★), barre d'heures, badge statut, date dernier entretien, boutons reset + activer
+- **Section bobines** : indicateur actif (★), point couleur, badge matière, barre poids restant, % restant, bouton activer
 
 ### Services
+
+**Composants**
 
 | Service | Paramètres | Description |
 |---------|-----------|-------------|
 | `printer_maintenance.reset_component` | `component`, `entry_id` *(opt)* | Réinitialise le compteur d'un composant après maintenance |
 | `printer_maintenance.set_interval` | `component`, `interval_hours`, `entry_id` *(opt)* | Modifie l'intervalle de maintenance |
 | `printer_maintenance.add_hours` | `hours`, `component` *(opt)*, `entry_id` *(opt)* | Ajoute des heures d'impression manuellement |
-| `printer_maintenance.set_total_hours` | `hours`, `entry_id` *(opt)* | Définit le total d'heures global sans toucher aux compteurs des composants |
-| `printer_maintenance.set_total_filament` | `meters`, `entry_id` *(opt)* | Définit le total de filament global sans toucher aux compteurs des composants |
+| `printer_maintenance.set_total_hours` | `hours`, `entry_id` *(opt)* | Définit le total d'heures global |
+| `printer_maintenance.set_total_filament` | `meters`, `entry_id` *(opt)* | Définit le total de filament global |
+
+**Plateaux**
+
+| Service | Paramètres | Description |
+|---------|-----------|-------------|
+| `printer_maintenance.add_plate` | `name`, `interval_hours` *(opt, défaut 200)*, `entry_id` *(opt)* | Ajoute un nouveau plateau |
+| `printer_maintenance.remove_plate` | `plate_id`, `entry_id` *(opt)* | Supprime un plateau et ses entités |
+| `printer_maintenance.set_active_plate` | `plate_id`, `entry_id` *(opt)* | Change le plateau actif (seul le plateau actif accumule les heures) |
+| `printer_maintenance.reset_plate` | `plate_id`, `entry_id` *(opt)* | Réinitialise le compteur d'un plateau après nettoyage |
+
+**Bobines de filament**
+
+| Service | Paramètres | Description |
+|---------|-----------|-------------|
+| `printer_maintenance.add_spool` | `name`, `material` *(opt)*, `brand` *(opt)*, `color` *(opt)*, `initial_weight_g` *(opt, défaut 1000)*, `diameter_mm` *(opt, défaut 1.75)*, `entry_id` *(opt)* | Ajoute une nouvelle bobine |
+| `printer_maintenance.remove_spool` | `spool_id`, `entry_id` *(opt)* | Supprime une bobine et ses entités |
+| `printer_maintenance.set_active_spool` | `spool_id`, `entry_id` *(opt)* | Change la bobine active (seule la bobine active se décrémente) |
+| `printer_maintenance.update_spool_weight` | `spool_id`, `remaining_weight_g`, `entry_id` *(opt)* | Corrige manuellement le poids restant |
 
 ### Logique des statuts
 
@@ -290,8 +353,9 @@ Le seuil est configurable par entrée d'intégration (Options → Seuil d'alerte
 - [ ] Éditeur visuel pour la carte Lovelace
 - [ ] Historique des maintenances
 - [x] Notifications HA automatiques au changement de statut
+- [x] Gestion multi-plateaux (heures, statut, date d'entretien par plateau)
+- [x] Gestion des bobines de filament (matière, marque, décrémentation automatique du poids)
 - [ ] Suivi de graissage par composant : date de dernier graissage + intervalle de graissage configurable (distinct de l'intervalle de maintenance général)
-- [ ] Gestion des bobines de filament (marque, matière, poids, stock)
 - [ ] Connecteurs OctoPrint / Moonraker / Klipper
 
 ---
