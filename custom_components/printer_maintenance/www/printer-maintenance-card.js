@@ -125,16 +125,23 @@ class PrinterMaintenanceCard extends HTMLElement {
       rows += `<div class="cat-label">${cat}</div>`;
 
       for (const comp of comps) {
-        const sid      = this._sid(`${comp.id}_status`);
-        const status   = this._val(sid, "ok");
-        const used     = parseFloat(this._attr(sid, "hours_used", 0));
-        const interval = parseFloat(this._attr(sid, "interval_hours", 1));
-        const pct      = Math.min(100, (used / interval) * 100).toFixed(1);
-        const sc       = STATUS[status] || STATUS.ok;
+        const sid       = this._sid(`${comp.id}_status`);
+        const status    = this._val(sid, "ok");
+        const used      = parseFloat(this._attr(sid, "hours_used", 0));
+        const interval  = parseFloat(this._attr(sid, "interval_hours", 1));
+        const pct       = Math.min(100, (used / interval) * 100).toFixed(1);
+        const sc        = STATUS[status] || STATUS.ok;
+        const lastReset = this._attr(sid, "last_reset");
+        const dateHtml  = lastReset
+          ? `<span class="last-date">${new Date(lastReset).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })}</span>`
+          : `<span class="last-date never">—</span>`;
 
         rows += `
           <div class="comp-row">
-            <span class="comp-name">${comp.name}</span>
+            <div class="comp-name-wrap">
+              <span class="comp-name">${comp.name}</span>
+              ${dateHtml}
+            </div>
             <div class="bar">
               <div class="bar-fill" style="width:${pct}%;background:${sc.color}"></div>
             </div>
@@ -233,12 +240,26 @@ class PrinterMaintenanceCard extends HTMLElement {
           gap: 6px;
           padding: 2px 0;
         }
+        .comp-name-wrap {
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
         .comp-name {
           font-size: 0.8em;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
+        .last-date {
+          font-size: 0.6em;
+          opacity: .45;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          margin-top: 1px;
+        }
+        .last-date.never { opacity: .25; }
         .bar {
           height: 5px;
           background: rgba(255,255,255,.09);

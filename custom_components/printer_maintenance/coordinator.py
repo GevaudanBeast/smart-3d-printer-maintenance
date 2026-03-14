@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
+from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_state_change_event
@@ -67,6 +68,9 @@ class PrinterMaintenanceCoordinator:
         self._filament_unsaved_m: float = 0.0
         self._unsubscribers: list[Any] = []
         self.listeners: list[Any] = []
+        # Components for which a "due/overdue" notification has already been sent.
+        # Cleared when the component is reset (back to ok).
+        self._notified_due: set[str] = set()
 
     # ------------------------------------------------------------------
     # Properties
@@ -350,6 +354,38 @@ class PrinterMaintenanceCoordinator:
         for comp_id in COMPONENTS:
             comp = components.setdefault(comp_id, {"hours_used": 0.0, "last_reset": None})
             comp["hours_used"] = comp.get("hours_used", 0.0) + hours
+        self._check_and_notify_maintenance()
+
+    def _check_and_notify_maintenance(self) -> None:
+        """Send a HA persistent notification for each component that is due or overdue."""
+        printer_name = self.entry.data.get("printer_name", "Printer")
+        for comp_id, comp_info in COMPONENTS.items():
+            data = self.get_component_data(comp_id)
+            status = data["status"]
+            notif_id = f"printer_maintenance_{self.entry.entry_id}_{comp_id}"
+            if status in (STATUS_DUE, STATUS_OVERDUE):
+                if comp_id not in self._notified_due:
+                    self._notified_due.add(comp_id)
+                    label = STATUS_OVERDUE if status == STATUS_OVERDUE else STATUS_DUE
+                    persistent_notification.async_create(
+                        self.hass,
+                        message=(
+                            f"**{comp_info['name']}** needs maintenance on **{printer_name}**.\n"
+                            f"Hours used: {data['hours_used']} h / {data['interval_hours']} h "
+                            f"({label})."
+                        ),
+                        title=f"🔧 {printer_name} — Maintenance {label}",
+                        notification_id=notif_id,
+                    )
+                    _LOGGER.info(
+                        "Maintenance notification sent for %s (%s) — %s",
+                        comp_id, printer_name, label,
+                    )
+            else:
+                # Status back to ok/soon: clear notification and tracking
+                if comp_id in self._notified_due:
+                    self._notified_due.discard(comp_id)
+                    persistent_notification.async_dismiss(self.hass, notif_id)
 
     async def _async_load_data(self) -> None:
         stored = await self._store.async_load()
@@ -390,6 +426,11 @@ class PrinterMaintenanceCoordinator:
         components[component_id]["hours_used"] = 0.0
         components[component_id]["last_reset"] = dt_util.utcnow().isoformat()
         await self._async_save_data()
+        # Dismiss notification and clear tracking if the component was due/overdue
+        if component_id in self._notified_due:
+            self._notified_due.discard(component_id)
+            notif_id = f"printer_maintenance_{self.entry.entry_id}_{component_id}"
+            persistent_notification.async_dismiss(self.hass, notif_id)
         self._notify_listeners()
         _LOGGER.info("Reset maintenance counter for component: %s", component_id)
 
@@ -424,6 +465,7 @@ class PrinterMaintenanceCoordinator:
                 component_id, {"hours_used": 0.0, "last_reset": None}
             )
             comp["hours_used"] = comp.get("hours_used", 0.0) + hours
+            self._check_and_notify_maintenance()
         else:
             self._apply_print_hours(hours)
         await self._async_save_data()

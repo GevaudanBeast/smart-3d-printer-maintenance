@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.sensor import (
+    SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
 )
@@ -12,6 +13,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from .const import (
     COMPONENTS,
@@ -54,6 +56,7 @@ async def async_setup_entry(
             ComponentHoursUsedSensor(coordinator, printer_name, unique_prefix, comp_id, comp_info),
             ComponentHoursRemainingSensor(coordinator, printer_name, unique_prefix, comp_id, comp_info),
             ComponentStatusSensor(coordinator, printer_name, unique_prefix, comp_id, comp_info),
+            ComponentLastResetSensor(coordinator, printer_name, unique_prefix, comp_id, comp_info),
         ]
 
     async_add_entities(entities)
@@ -240,6 +243,25 @@ class ComponentStatusSensor(_BaseComponentSensor):
             "interval_hours": d["interval_hours"],
             "last_reset": d["last_reset"],
         }
+
+
+class ComponentLastResetSensor(_BaseComponentSensor):
+    """Sensor exposing the date of last maintenance/greasing for a component."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_icon = "mdi:calendar-check"
+
+    def __init__(self, coordinator, printer_name, unique_prefix, comp_id, comp_info):
+        super().__init__(coordinator, printer_name, unique_prefix, comp_id, comp_info)
+        self._attr_unique_id = f"{unique_prefix}_{comp_id}_last_reset"
+        self._attr_name = f"{comp_info['name']} Last Maintenance"
+
+    @property
+    def native_value(self):
+        last_reset = self._comp_data()["last_reset"]
+        if last_reset is None:
+            return None
+        return dt_util.parse_datetime(last_reset)
 
 
 class TotalJobsOkSensor(_BaseMaintenanceSensor):
