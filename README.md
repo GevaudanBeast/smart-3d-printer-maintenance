@@ -144,6 +144,7 @@ The threshold is configurable per integration entry (Options → "Soon" alert th
 - [ ] Lovelace card visual editor (GUI config)
 - [ ] Maintenance history log
 - [x] Automatic HA notifications on status change
+- [ ] Per-component greasing tracking: dedicated greasing date + configurable greasing interval (separate from the general maintenance interval)
 - [ ] Filament spool management (brand, material, weight, stock)
 - [ ] OctoPrint / Moonraker / Klipper connectors
 
@@ -289,6 +290,7 @@ Le seuil est configurable par entrée d'intégration (Options → Seuil d'alerte
 - [ ] Éditeur visuel pour la carte Lovelace
 - [ ] Historique des maintenances
 - [x] Notifications HA automatiques au changement de statut
+- [ ] Suivi de graissage par composant : date de dernier graissage + intervalle de graissage configurable (distinct de l'intervalle de maintenance général)
 - [ ] Gestion des bobines de filament (marque, matière, poids, stock)
 - [ ] Connecteurs OctoPrint / Moonraker / Klipper
 
