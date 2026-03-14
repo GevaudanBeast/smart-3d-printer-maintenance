@@ -1,6 +1,8 @@
 """Constants for the 3D Printer Maintenance integration."""
 from __future__ import annotations
 
+import math
+
 DOMAIN = "printer_maintenance"
 STORAGE_VERSION = 1
 STORAGE_KEY = "printer_maintenance_{}"
@@ -51,6 +53,21 @@ PRINTER_BRANDS = [
     "Artillery",
     "Other",
 ]
+
+DEFAULT_PLATE_INTERVAL = 200  # hours
+
+MATERIAL_DENSITIES: dict[str, float] = {
+    "PLA": 1.24,
+    "PETG": 1.27,
+    "ABS": 1.04,
+    "ASA": 1.07,
+    "TPU": 1.21,
+    "Nylon": 1.14,
+    "PC": 1.20,
+    "Other": 1.24,
+}
+SPOOL_MATERIALS = list(MATERIAL_DENSITIES.keys())
+DEFAULT_FILAMENT_DIAMETER_MM = 1.75
 
 # Components tracked with default maintenance intervals (hours)
 COMPONENTS: dict[str, dict] = {

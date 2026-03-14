@@ -59,7 +59,23 @@ async def async_setup_entry(
             ComponentLastResetSensor(coordinator, printer_name, unique_prefix, comp_id, comp_info),
         ]
 
+    # Register active plate/spool global sensors
+    entities.append(ActivePlateSensor(coordinator, printer_name, unique_prefix))
+    entities.append(ActiveSpoolSensor(coordinator, printer_name, unique_prefix))
+
+    # Register existing plates
+    for plate_id in coordinator.get_all_plates():
+        entities += make_plate_sensors(coordinator, printer_name, unique_prefix, plate_id)
+
+    # Register existing spools
+    for spool_id in coordinator.get_all_spools():
+        entities += make_spool_sensors(coordinator, printer_name, unique_prefix, spool_id)
+
     async_add_entities(entities)
+
+    # Store callbacks for dynamic entity registration
+    coordinator._plate_sensor_add_fn = async_add_entities
+    coordinator._spool_sensor_add_fn = async_add_entities
 
 
 # ---------------------------------------------------------------------------

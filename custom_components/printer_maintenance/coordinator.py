@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+import math
+import re
 from datetime import datetime
 from typing import Any
 
@@ -25,11 +27,14 @@ from .const import (
     CONF_STATUS_ENTITY,
     DEFAULT_COMPLETED_STATES,
     DEFAULT_FAILURE_STATES,
+    DEFAULT_FILAMENT_DIAMETER_MM,
     DEFAULT_PAUSED_STATES,
+    DEFAULT_PLATE_INTERVAL,
     DEFAULT_PRINTING_STATES,
     CONF_SOON_THRESHOLD,
     DEFAULT_SOON_THRESHOLD,
     DOMAIN,
+    MATERIAL_DENSITIES,
     STATUS_DUE,
     STATUS_OK,
     STATUS_OVERDUE,
@@ -71,6 +76,16 @@ class PrinterMaintenanceCoordinator:
         # Components for which a "due/overdue" notification has already been sent.
         # Cleared when the component is reset (back to ok).
         self._notified_due: set[str] = set()
+        # Dynamic entity registration callbacks (set by sensor.py / button.py)
+        self._plate_sensor_add_fn = None
+        self._plate_button_add_fn = None
+        self._spool_sensor_add_fn = None
+        self._spool_button_add_fn = None
+        # Entity references for dynamic removal
+        self._plate_sensor_entities: dict[str, list] = {}
+        self._plate_button_entities: dict[str, list] = {}
+        self._spool_sensor_entities: dict[str, list] = {}
+        self._spool_button_entities: dict[str, list] = {}
 
     # ------------------------------------------------------------------
     # Properties
@@ -335,6 +350,15 @@ class PrinterMaintenanceCoordinator:
             )
             self._filament_unsaved_m += delta
             _LOGGER.debug("Filament +%.2f m (total %.2f m)", delta, self._data["total_filament_m"])
+            active_spool = self.get_active_spool_id()
+            if active_spool:
+                spools = self._data.setdefault("spools", {})
+                if active_spool in spools:
+                    grams = self._grams_from_meters(active_spool, delta)
+                    spools[active_spool]["remaining_weight_g"] = max(
+                        0.0,
+                        spools[active_spool].get("remaining_weight_g", 0.0) - grams
+                    )
             # Persist only when unsaved accumulation crosses the threshold
             if self._filament_unsaved_m >= _MIN_FILAMENT_SAVE_M:
                 self._filament_unsaved_m = 0.0
@@ -354,6 +378,11 @@ class PrinterMaintenanceCoordinator:
         for comp_id in COMPONENTS:
             comp = components.setdefault(comp_id, {"hours_used": 0.0, "last_reset": None})
             comp["hours_used"] = comp.get("hours_used", 0.0) + hours
+        active_plate = self.get_active_plate_id()
+        if active_plate:
+            plates = self._data.setdefault("plates", {})
+            if active_plate in plates:
+                plates[active_plate]["hours_used"] = plates[active_plate].get("hours_used", 0.0) + hours
         self._check_and_notify_maintenance()
 
     def _check_and_notify_maintenance(self) -> None:
@@ -386,6 +415,35 @@ class PrinterMaintenanceCoordinator:
                 if comp_id in self._notified_due:
                     self._notified_due.discard(comp_id)
                     persistent_notification.async_dismiss(self.hass, notif_id)
+        # Check active plate
+        active_plate = self.get_active_plate_id()
+        if active_plate:
+            plate_data = self.get_plate_data(active_plate)
+            plate_status = plate_data["status"]
+            plate_notif_key = f"plate_{active_plate}"
+            notif_id = f"printer_maintenance_{self.entry.entry_id}_plate_{active_plate}"
+            if plate_status in (STATUS_DUE, STATUS_OVERDUE):
+                if plate_notif_key not in self._notified_due:
+                    self._notified_due.add(plate_notif_key)
+                    label = STATUS_OVERDUE if plate_status == STATUS_OVERDUE else STATUS_DUE
+                    persistent_notification.async_create(
+                        self.hass,
+                        message=(
+                            f"**Plate {plate_data['name']}** needs maintenance on **{printer_name}**.\n"
+                            f"Hours used: {plate_data['hours_used']} h / {plate_data['interval_hours']} h "
+                            f"({label})."
+                        ),
+                        title=f"🔧 {printer_name} — Plate Maintenance {label}",
+                        notification_id=notif_id,
+                    )
+                    _LOGGER.info(
+                        "Plate maintenance notification sent for %s (%s) — %s",
+                        active_plate, printer_name, label,
+                    )
+            else:
+                if plate_notif_key in self._notified_due:
+                    self._notified_due.discard(plate_notif_key)
+                    persistent_notification.async_dismiss(self.hass, notif_id)
 
     async def _async_load_data(self) -> None:
         stored = await self._store.async_load()
@@ -408,6 +466,8 @@ class PrinterMaintenanceCoordinator:
                     for comp_id in COMPONENTS
                 },
             }
+        self._data.setdefault("plates", {})
+        self._data.setdefault("spools", {})
 
     async def _async_save_data(self) -> None:
         await self._store.async_save(self._data)
@@ -468,5 +528,231 @@ class PrinterMaintenanceCoordinator:
             self._check_and_notify_maintenance()
         else:
             self._apply_print_hours(hours)
+        await self._async_save_data()
+        self._notify_listeners()
+
+    # ------------------------------------------------------------------
+    # Static / instance helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _slugify(name: str) -> str:
+        return re.sub(r'[^a-z0-9]+', '_', name.lower().strip()).strip('_')
+
+    def _grams_from_meters(self, spool_id: str, meters: float) -> float:
+        spool = self._data.get("spools", {}).get(spool_id, {})
+        material = spool.get("material", "PLA")
+        diameter_mm = spool.get("diameter_mm", DEFAULT_FILAMENT_DIAMETER_MM)
+        density = MATERIAL_DENSITIES.get(material, MATERIAL_DENSITIES["Other"])
+        radius_cm = (diameter_mm / 2.0) / 10.0
+        volume_per_m = math.pi * radius_cm ** 2 * 100.0
+        return meters * volume_per_m * density
+
+    # ------------------------------------------------------------------
+    # Plate methods
+    # ------------------------------------------------------------------
+
+    def get_all_plates(self) -> dict:
+        return self._data.get("plates", {})
+
+    def get_active_plate_id(self) -> str | None:
+        for pid, p in self._data.get("plates", {}).items():
+            if p.get("active"):
+                return pid
+        return None
+
+    def get_plate_data(self, plate_id: str) -> dict:
+        plates = self._data.get("plates", {})
+        p = plates.get(plate_id, {})
+        interval = float(p.get("interval_hours", DEFAULT_PLATE_INTERVAL))
+        hours_used = p.get("hours_used", 0.0)
+        remaining = max(0.0, interval - hours_used)
+        if hours_used > interval:
+            status = STATUS_OVERDUE
+        elif hours_used >= interval:
+            status = STATUS_DUE
+        elif remaining <= interval * self.soon_threshold_pct:
+            status = STATUS_SOON
+        else:
+            status = STATUS_OK
+        return {
+            "name": p.get("name", plate_id),
+            "hours_used": round(hours_used, 1),
+            "interval_hours": interval,
+            "hours_remaining": round(remaining, 1),
+            "status": status,
+            "last_reset": p.get("last_reset"),
+            "active": p.get("active", False),
+        }
+
+    async def async_add_plate(self, name: str, interval_hours: float) -> str:
+        slug = self._slugify(name)
+        plates = self._data.setdefault("plates", {})
+        is_first = len(plates) == 0
+        plate_id = slug
+        i = 2
+        while plate_id in plates:
+            plate_id = f"{slug}_{i}"
+            i += 1
+        plates[plate_id] = {
+            "name": name,
+            "hours_used": 0.0,
+            "last_reset": None,
+            "active": is_first,
+            "interval_hours": interval_hours,
+        }
+        await self._async_save_data()
+        if self._plate_sensor_add_fn:
+            printer_name = self.entry.data.get("printer_name", "Printer")
+            from .sensor import make_plate_sensors
+            entities = make_plate_sensors(self, printer_name, self.entry.entry_id, plate_id)
+            self._plate_sensor_entities[plate_id] = entities
+            self._plate_sensor_add_fn(entities)
+        if self._plate_button_add_fn:
+            printer_name = self.entry.data.get("printer_name", "Printer")
+            from .button import make_plate_buttons
+            entities = make_plate_buttons(self, printer_name, self.entry.entry_id, plate_id, name)
+            self._plate_button_entities[plate_id] = entities
+            self._plate_button_add_fn(entities)
+        self._notify_listeners()
+        _LOGGER.info("Added plate: %s (%s)", plate_id, name)
+        return plate_id
+
+    async def async_remove_plate(self, plate_id: str) -> None:
+        plates = self._data.get("plates", {})
+        if plate_id not in plates:
+            return
+        was_active = plates[plate_id].get("active", False)
+        del plates[plate_id]
+        if was_active and plates:
+            next_id = next(iter(plates))
+            plates[next_id]["active"] = True
+        await self._async_save_data()
+        for entity in self._plate_sensor_entities.pop(plate_id, []):
+            self.hass.async_create_task(entity.async_remove())
+        for entity in self._plate_button_entities.pop(plate_id, []):
+            self.hass.async_create_task(entity.async_remove())
+        self._notify_listeners()
+
+    async def async_set_active_plate(self, plate_id: str) -> None:
+        plates = self._data.get("plates", {})
+        if plate_id not in plates:
+            return
+        for pid in plates:
+            plates[pid]["active"] = (pid == plate_id)
+        await self._async_save_data()
+        self._notify_listeners()
+
+    async def async_reset_plate(self, plate_id: str) -> None:
+        plates = self._data.get("plates", {})
+        if plate_id not in plates:
+            return
+        plates[plate_id]["hours_used"] = 0.0
+        plates[plate_id]["last_reset"] = dt_util.utcnow().isoformat()
+        notif_id = f"printer_maintenance_{self.entry.entry_id}_plate_{plate_id}"
+        persistent_notification.async_dismiss(self.hass, notif_id)
+        await self._async_save_data()
+        self._notify_listeners()
+
+    # ------------------------------------------------------------------
+    # Spool methods
+    # ------------------------------------------------------------------
+
+    def get_all_spools(self) -> dict:
+        return self._data.get("spools", {})
+
+    def get_active_spool_id(self) -> str | None:
+        for sid, s in self._data.get("spools", {}).items():
+            if s.get("active"):
+                return sid
+        return None
+
+    def get_spool_data(self, spool_id: str) -> dict:
+        s = self._data.get("spools", {}).get(spool_id, {})
+        initial = s.get("initial_weight_g", 1000.0)
+        remaining = s.get("remaining_weight_g", initial)
+        pct = round(remaining / initial * 100, 1) if initial > 0 else 0.0
+        return {
+            "name": s.get("name", spool_id),
+            "material": s.get("material", "PLA"),
+            "color": s.get("color", ""),
+            "brand": s.get("brand", ""),
+            "initial_weight_g": round(initial, 0),
+            "remaining_weight_g": round(remaining, 1),
+            "remaining_pct": pct,
+            "diameter_mm": s.get("diameter_mm", DEFAULT_FILAMENT_DIAMETER_MM),
+            "active": s.get("active", False),
+        }
+
+    async def async_add_spool(
+        self, name: str, material: str, brand: str, color: str,
+        initial_weight_g: float, diameter_mm: float
+    ) -> str:
+        slug = self._slugify(name)
+        spools = self._data.setdefault("spools", {})
+        is_first = len(spools) == 0
+        spool_id = slug
+        i = 2
+        while spool_id in spools:
+            spool_id = f"{slug}_{i}"
+            i += 1
+        spools[spool_id] = {
+            "name": name,
+            "material": material,
+            "brand": brand,
+            "color": color,
+            "initial_weight_g": initial_weight_g,
+            "remaining_weight_g": initial_weight_g,
+            "diameter_mm": diameter_mm,
+            "active": is_first,
+        }
+        await self._async_save_data()
+        if self._spool_sensor_add_fn:
+            printer_name = self.entry.data.get("printer_name", "Printer")
+            from .sensor import make_spool_sensors
+            entities = make_spool_sensors(self, printer_name, self.entry.entry_id, spool_id)
+            self._spool_sensor_entities[spool_id] = entities
+            self._spool_sensor_add_fn(entities)
+        if self._spool_button_add_fn:
+            printer_name = self.entry.data.get("printer_name", "Printer")
+            from .button import make_spool_buttons
+            entities = make_spool_buttons(self, printer_name, self.entry.entry_id, spool_id, name)
+            self._spool_button_entities[spool_id] = entities
+            self._spool_button_add_fn(entities)
+        self._notify_listeners()
+        _LOGGER.info("Added spool: %s (%s %s)", spool_id, material, name)
+        return spool_id
+
+    async def async_remove_spool(self, spool_id: str) -> None:
+        spools = self._data.get("spools", {})
+        if spool_id not in spools:
+            return
+        was_active = spools[spool_id].get("active", False)
+        del spools[spool_id]
+        if was_active and spools:
+            next_id = next(iter(spools))
+            spools[next_id]["active"] = True
+        await self._async_save_data()
+        for entity in self._spool_sensor_entities.pop(spool_id, []):
+            self.hass.async_create_task(entity.async_remove())
+        for entity in self._spool_button_entities.pop(spool_id, []):
+            self.hass.async_create_task(entity.async_remove())
+        self._notify_listeners()
+
+    async def async_set_active_spool(self, spool_id: str) -> None:
+        spools = self._data.get("spools", {})
+        if spool_id not in spools:
+            return
+        for sid in spools:
+            spools[sid]["active"] = (sid == spool_id)
+        self._last_filament_value = None
+        await self._async_save_data()
+        self._notify_listeners()
+
+    async def async_update_spool_weight(self, spool_id: str, remaining_weight_g: float) -> None:
+        spools = self._data.get("spools", {})
+        if spool_id not in spools:
+            return
+        spools[spool_id]["remaining_weight_g"] = remaining_weight_g
         await self._async_save_data()
         self._notify_listeners()
