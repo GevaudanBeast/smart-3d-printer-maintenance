@@ -341,7 +341,7 @@ class PlateHoursUsedSensor(_BasePlateSensor):
     @property
     def extra_state_attributes(self):
         d = self._plate()
-        return {"interval_hours": d["interval_hours"], "last_reset": d["last_reset"], "active": d["active"]}
+        return {"name": d["name"], "interval_hours": d["interval_hours"], "last_reset": d["last_reset"], "active": d["active"]}
 
 
 class PlateHoursRemainingSensor(_BasePlateSensor):
@@ -459,6 +459,7 @@ class SpoolRemainingWeightSensor(_BaseSpoolSensor):
     def extra_state_attributes(self):
         d = self._spool()
         return {
+            "name": d["name"],
             "material": d["material"],
             "brand": d["brand"],
             "color": d["color"],

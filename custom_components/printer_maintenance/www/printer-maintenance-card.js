@@ -494,10 +494,6 @@ class PrinterMaintenanceCard extends HTMLElement {
     });
   }
 
-  setConfig(config) {
-    if (!config.printer) throw new Error("Veuillez définir 'printer: k1c'");
-    this._config = config;
-  }
 }
 
 if (!customElements.get("printer-maintenance-card")) {
