@@ -20,10 +20,11 @@ Designed first for the **Creality K1C** (with [`ha_creality_ws`](https://github.
 - **Job counting (OK / KO)** — per configurable state lists; ambiguous states (idle, standby) are ignored
 - **11 tracked components** with individually configurable maintenance intervals
 - **4 maintenance statuses**: `OK` · `Soon` · `Due` · `Overdue` (configurable alert threshold)
-- **36 sensors** (global stats + per-component hours used / remaining / status)
+- **Automatic HA persistent notifications** — fired when a component reaches `Due` or `Overdue`, dismissed automatically on reset
+- **49 sensors** (global stats + per-component hours used / remaining / status / last maintenance date)
 - **11 reset buttons** (one per component, configurable category)
-- **3 services**: reset a counter, set an interval, add hours manually
-- **Compact Lovelace card** — auto-registered, no manual resource setup, complementary to ha_creality_ws (no status/temperature duplication)
+- **5 services**: reset a counter, set an interval, add hours, set total hours, set total filament
+- **Compact Lovelace card** — auto-registered, no manual resource setup, shows last maintenance date per component
 - **Persistent storage** — survives HA restarts, resumes in-progress sessions
 - **Multi-printer** — one integration entry per printer
 - **FR / EN translations**
@@ -108,9 +109,9 @@ title: "K1C Maintenance"  # optional
 ```
 
 The card displays (designed to complement ha_creality_ws, no duplication):
-- Global stats: total print hours · filament used · jobs OK · jobs KO
-- Per-component: progress bar, hours used / interval, status badge
-- Reset panel hidden behind a slide toggle (avoids accidental resets)
+- Global stats: total print hours · filament used · jobs count
+- Per-component: progress bar, hours used / interval, status badge, **last maintenance date**
+- Inline reset button per component (appears on hover)
 
 ### Services
 
@@ -119,6 +120,8 @@ The card displays (designed to complement ha_creality_ws, no duplication):
 | `printer_maintenance.reset_component` | `component`, `entry_id` *(opt)* | Reset a component counter after maintenance |
 | `printer_maintenance.set_interval` | `component`, `interval_hours`, `entry_id` *(opt)* | Update a maintenance interval |
 | `printer_maintenance.add_hours` | `hours`, `component` *(opt)*, `entry_id` *(opt)* | Manually add print hours |
+| `printer_maintenance.set_total_hours` | `hours`, `entry_id` *(opt)* | Set the global print-hour total without touching component counters |
+| `printer_maintenance.set_total_filament` | `meters`, `entry_id` *(opt)* | Set the global filament total without touching component counters |
 
 ### Status Logic
 
@@ -140,7 +143,7 @@ The threshold is configurable per integration entry (Options → "Soon" alert th
 
 - [ ] Lovelace card visual editor (GUI config)
 - [ ] Maintenance history log
-- [ ] Automatic HA notifications on status change
+- [x] Automatic HA notifications on status change
 - [ ] Filament spool management (brand, material, weight, stock)
 - [ ] OctoPrint / Moonraker / Klipper connectors
 
@@ -162,10 +165,11 @@ Conçue en priorité pour la **Creality K1C** (avec [`ha_creality_ws`](https://g
 - **Comptage des jobs (OK / KO)** — basé sur des listes d'états configurables ; les états ambigus (idle, standby) sont ignorés
 - **11 composants suivis** avec intervalles de maintenance individuellement configurables
 - **4 statuts de maintenance** : `OK` · `Bientôt` · `Requis` · `En retard` (seuil d'alerte configurable)
-- **36 capteurs** (statistiques globales + heures utilisées / restantes / statut par composant)
+- **Notifications HA persistantes automatiques** — déclenchées quand un composant passe en `Requis` ou `En retard`, supprimées automatiquement à la réinitialisation
+- **49 capteurs** (statistiques globales + heures utilisées / restantes / statut / date dernier entretien par composant)
 - **11 boutons de réinitialisation** (un par composant)
-- **3 services** : réinitialiser un compteur, définir un intervalle, ajouter des heures manuellement
-- **Carte Lovelace compacte** — enregistrée automatiquement, complémentaire à ha_creality_ws (aucune duplication de statut/température)
+- **5 services** : réinitialiser un compteur, définir un intervalle, ajouter des heures, définir le total d'heures, définir le total de filament
+- **Carte Lovelace compacte** — enregistrée automatiquement, affiche la date de dernier entretien par composant
 - **Stockage persistant** — résiste aux redémarrages HA, reprend les sessions en cours
 - **Multi-imprimantes** — une entrée d'intégration par imprimante
 - **Traductions FR / EN**
@@ -250,9 +254,9 @@ title: "K1C Maintenance"  # optionnel
 ```
 
 La carte affiche (conçue pour compléter ha_creality_ws, sans duplication) :
-- Statistiques globales : heures totales · filament utilisé · jobs OK · jobs KO
-- Par composant : barre de progression, heures utilisées / intervalle, badge de statut
-- Panneau de réinitialisation masqué derrière un bouton coulissant (évite les resets accidentels)
+- Statistiques globales : heures totales · filament utilisé · nombre de jobs
+- Par composant : barre de progression, heures utilisées / intervalle, badge de statut, **date du dernier entretien**
+- Bouton de réinitialisation par composant (visible au survol)
 
 ### Services
 
@@ -261,6 +265,8 @@ La carte affiche (conçue pour compléter ha_creality_ws, sans duplication) :
 | `printer_maintenance.reset_component` | `component`, `entry_id` *(opt)* | Réinitialise le compteur d'un composant après maintenance |
 | `printer_maintenance.set_interval` | `component`, `interval_hours`, `entry_id` *(opt)* | Modifie l'intervalle de maintenance |
 | `printer_maintenance.add_hours` | `hours`, `component` *(opt)*, `entry_id` *(opt)* | Ajoute des heures d'impression manuellement |
+| `printer_maintenance.set_total_hours` | `hours`, `entry_id` *(opt)* | Définit le total d'heures global sans toucher aux compteurs des composants |
+| `printer_maintenance.set_total_filament` | `meters`, `entry_id` *(opt)* | Définit le total de filament global sans toucher aux compteurs des composants |
 
 ### Logique des statuts
 
@@ -282,7 +288,7 @@ Le seuil est configurable par entrée d'intégration (Options → Seuil d'alerte
 
 - [ ] Éditeur visuel pour la carte Lovelace
 - [ ] Historique des maintenances
-- [ ] Notifications HA automatiques au changement de statut
+- [x] Notifications HA automatiques au changement de statut
 - [ ] Gestion des bobines de filament (marque, matière, poids, stock)
 - [ ] Connecteurs OctoPrint / Moonraker / Klipper
 
