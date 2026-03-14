@@ -78,5 +78,78 @@
         }
       }
     }
+  },
+  "services": {
+    "add_plate": {
+      "name": "Ajouter un plateau",
+      "description": "Ajoute un nouveau plateau d'impression avec son propre compteur d'heures.",
+      "fields": {
+        "name": { "name": "Nom", "description": "Nom du plateau (ex. « PEI Lisse »)." },
+        "interval_hours": { "name": "Intervalle (heures)", "description": "Seuil de maintenance en heures d'impression. Défaut 200 h." },
+        "entry_id": { "name": "Imprimante (entry ID)", "description": "Laisser vide pour toutes les imprimantes." }
+      }
+    },
+    "remove_plate": {
+      "name": "Supprimer un plateau",
+      "description": "Supprime un plateau et ses entités associées.",
+      "fields": {
+        "plate_id": { "name": "ID du plateau", "description": "Identifiant interne du plateau." },
+        "entry_id": { "name": "Imprimante (entry ID)", "description": "Laisser vide pour toutes les imprimantes." }
+      }
+    },
+    "set_active_plate": {
+      "name": "Activer un plateau",
+      "description": "Définit le plateau actif (seul le plateau actif accumule les heures).",
+      "fields": {
+        "plate_id": { "name": "ID du plateau", "description": "Identifiant interne du plateau à activer." },
+        "entry_id": { "name": "Imprimante (entry ID)", "description": "Laisser vide pour toutes les imprimantes." }
+      }
+    },
+    "reset_plate": {
+      "name": "Remettre à zéro le compteur d'un plateau",
+      "description": "Remet à zéro le compteur d'heures d'un plateau (après nettoyage ou remplacement).",
+      "fields": {
+        "plate_id": { "name": "ID du plateau", "description": "Identifiant interne du plateau." },
+        "entry_id": { "name": "Imprimante (entry ID)", "description": "Laisser vide pour toutes les imprimantes." }
+      }
+    },
+    "add_spool": {
+      "name": "Ajouter une bobine",
+      "description": "Ajoute une nouvelle bobine de filament pour suivre son poids restant.",
+      "fields": {
+        "name": { "name": "Nom", "description": "Nom de la bobine (ex. « PLA Blanc Bambu »)." },
+        "material": { "name": "Matière", "description": "Type de filament." },
+        "brand": { "name": "Marque", "description": "Marque du filament." },
+        "color": { "name": "Couleur", "description": "Couleur du filament." },
+        "initial_weight_g": { "name": "Poids initial (g)", "description": "Poids net du filament en grammes." },
+        "diameter_mm": { "name": "Diamètre (mm)", "description": "Diamètre du filament en mm." },
+        "entry_id": { "name": "Imprimante (entry ID)", "description": "Laisser vide pour toutes les imprimantes." }
+      }
+    },
+    "remove_spool": {
+      "name": "Supprimer une bobine",
+      "description": "Supprime une bobine et ses entités associées.",
+      "fields": {
+        "spool_id": { "name": "ID de la bobine", "description": "Identifiant interne de la bobine." },
+        "entry_id": { "name": "Imprimante (entry ID)", "description": "Laisser vide pour toutes les imprimantes." }
+      }
+    },
+    "set_active_spool": {
+      "name": "Activer une bobine",
+      "description": "Définit la bobine active (seule la bobine active est décrémentée pendant l'impression).",
+      "fields": {
+        "spool_id": { "name": "ID de la bobine", "description": "Identifiant interne de la bobine à activer." },
+        "entry_id": { "name": "Imprimante (entry ID)", "description": "Laisser vide pour toutes les imprimantes." }
+      }
+    },
+    "update_spool_weight": {
+      "name": "Mettre à jour le poids restant d'une bobine",
+      "description": "Définit manuellement le poids de filament restant sur une bobine.",
+      "fields": {
+        "spool_id": { "name": "ID de la bobine", "description": "Identifiant interne de la bobine." },
+        "remaining_weight_g": { "name": "Poids restant (g)", "description": "Poids de filament restant en grammes." },
+        "entry_id": { "name": "Imprimante (entry ID)", "description": "Laisser vide pour toutes les imprimantes." }
+      }
+    }
   }
 }

@@ -308,3 +308,215 @@ class TotalJobsKoSensor(_BaseMaintenanceSensor):
     @property
     def native_value(self) -> int:
         return self._coordinator.total_jobs_ko
+
+
+# ── Plate sensors ────────────────────────────────────────────────────────────
+
+class _BasePlateSensor(_BaseMaintenanceSensor):
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator, printer_name, unique_prefix, plate_id):
+        super().__init__(coordinator, printer_name, unique_prefix)
+        self._plate_id = plate_id
+        self._attr_device_info = _device_info(DOMAIN, unique_prefix, printer_name)
+
+    def _plate(self):
+        return self._coordinator.get_plate_data(self._plate_id)
+
+
+class PlateHoursUsedSensor(_BasePlateSensor):
+    _attr_native_unit_of_measurement = "h"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, printer_name, unique_prefix, plate_id):
+        super().__init__(coordinator, printer_name, unique_prefix, plate_id)
+        self._attr_unique_id = f"{unique_prefix}_plate_{plate_id}_hours_used"
+        self._attr_name = f"Plate {self._coordinator.get_plate_data(plate_id)['name']} Hours Used"
+        self._attr_icon = "mdi:layers-outline"
+
+    @property
+    def native_value(self):
+        return self._plate()["hours_used"]
+
+    @property
+    def extra_state_attributes(self):
+        d = self._plate()
+        return {"interval_hours": d["interval_hours"], "last_reset": d["last_reset"], "active": d["active"]}
+
+
+class PlateHoursRemainingSensor(_BasePlateSensor):
+    _attr_native_unit_of_measurement = "h"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, printer_name, unique_prefix, plate_id):
+        super().__init__(coordinator, printer_name, unique_prefix, plate_id)
+        self._attr_unique_id = f"{unique_prefix}_plate_{plate_id}_hours_remaining"
+        self._attr_name = f"Plate {self._coordinator.get_plate_data(plate_id)['name']} Hours Remaining"
+        self._attr_icon = "mdi:timer-outline"
+
+    @property
+    def native_value(self):
+        return self._plate()["hours_remaining"]
+
+
+class PlateStatusSensor(_BasePlateSensor):
+
+    def __init__(self, coordinator, printer_name, unique_prefix, plate_id):
+        super().__init__(coordinator, printer_name, unique_prefix, plate_id)
+        self._attr_unique_id = f"{unique_prefix}_plate_{plate_id}_status"
+        self._attr_name = f"Plate {self._coordinator.get_plate_data(plate_id)['name']} Status"
+
+    @property
+    def native_value(self):
+        return self._plate()["status"]
+
+    @property
+    def icon(self):
+        return STATUS_ICON.get(self._plate()["status"], "mdi:help-circle")
+
+    @property
+    def extra_state_attributes(self):
+        d = self._plate()
+        return {
+            "hours_used": d["hours_used"],
+            "hours_remaining": d["hours_remaining"],
+            "interval_hours": d["interval_hours"],
+            "last_reset": d["last_reset"],
+            "active": d["active"],
+        }
+
+
+class PlateLastResetSensor(_BasePlateSensor):
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_icon = "mdi:calendar-check"
+
+    def __init__(self, coordinator, printer_name, unique_prefix, plate_id):
+        super().__init__(coordinator, printer_name, unique_prefix, plate_id)
+        self._attr_unique_id = f"{unique_prefix}_plate_{plate_id}_last_maintenance"
+        self._attr_name = f"Plate {self._coordinator.get_plate_data(plate_id)['name']} Last Maintenance"
+
+    @property
+    def native_value(self):
+        lr = self._plate()["last_reset"]
+        return dt_util.parse_datetime(lr) if lr else None
+
+
+class ActivePlateSensor(_BaseMaintenanceSensor):
+    _attr_icon = "mdi:layers"
+
+    def __init__(self, coordinator, printer_name, unique_prefix):
+        super().__init__(coordinator, printer_name, unique_prefix)
+        self._attr_unique_id = f"{unique_prefix}_active_plate"
+        self._attr_name = "Active Plate"
+        self._attr_device_info = _device_info(DOMAIN, unique_prefix, printer_name)
+
+    @property
+    def native_value(self):
+        pid = self._coordinator.get_active_plate_id()
+        if pid:
+            return self._coordinator.get_plate_data(pid)["name"]
+        return None
+
+
+def make_plate_sensors(coordinator, printer_name, unique_prefix, plate_id):
+    return [
+        PlateHoursUsedSensor(coordinator, printer_name, unique_prefix, plate_id),
+        PlateHoursRemainingSensor(coordinator, printer_name, unique_prefix, plate_id),
+        PlateStatusSensor(coordinator, printer_name, unique_prefix, plate_id),
+        PlateLastResetSensor(coordinator, printer_name, unique_prefix, plate_id),
+    ]
+
+
+# ── Spool sensors ─────────────────────────────────────────────────────────────
+
+class _BaseSpoolSensor(_BaseMaintenanceSensor):
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator, printer_name, unique_prefix, spool_id):
+        super().__init__(coordinator, printer_name, unique_prefix)
+        self._spool_id = spool_id
+        self._attr_device_info = _device_info(DOMAIN, unique_prefix, printer_name)
+
+    def _spool(self):
+        return self._coordinator.get_spool_data(self._spool_id)
+
+
+class SpoolRemainingWeightSensor(_BaseSpoolSensor):
+    _attr_native_unit_of_measurement = "g"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:weight-gram"
+
+    def __init__(self, coordinator, printer_name, unique_prefix, spool_id):
+        super().__init__(coordinator, printer_name, unique_prefix, spool_id)
+        self._attr_unique_id = f"{unique_prefix}_spool_{spool_id}_remaining"
+        self._attr_name = f"Spool {self._coordinator.get_spool_data(spool_id)['name']} Remaining"
+
+    @property
+    def native_value(self):
+        return round(self._spool()["remaining_weight_g"], 0)
+
+    @property
+    def extra_state_attributes(self):
+        d = self._spool()
+        return {
+            "material": d["material"],
+            "brand": d["brand"],
+            "color": d["color"],
+            "initial_weight_g": d["initial_weight_g"],
+            "remaining_pct": d["remaining_pct"],
+            "diameter_mm": d["diameter_mm"],
+            "active": d["active"],
+        }
+
+
+class SpoolRemainingPctSensor(_BaseSpoolSensor):
+    _attr_native_unit_of_measurement = "%"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:percent"
+
+    def __init__(self, coordinator, printer_name, unique_prefix, spool_id):
+        super().__init__(coordinator, printer_name, unique_prefix, spool_id)
+        self._attr_unique_id = f"{unique_prefix}_spool_{spool_id}_remaining_pct"
+        self._attr_name = f"Spool {self._coordinator.get_spool_data(spool_id)['name']} Remaining %"
+
+    @property
+    def native_value(self):
+        return self._spool()["remaining_pct"]
+
+
+class ActiveSpoolSensor(_BaseMaintenanceSensor):
+    _attr_icon = "mdi:spool"
+
+    def __init__(self, coordinator, printer_name, unique_prefix):
+        super().__init__(coordinator, printer_name, unique_prefix)
+        self._attr_unique_id = f"{unique_prefix}_active_spool"
+        self._attr_name = "Active Spool"
+        self._attr_device_info = _device_info(DOMAIN, unique_prefix, printer_name)
+
+    @property
+    def native_value(self):
+        sid = self._coordinator.get_active_spool_id()
+        if sid:
+            return self._coordinator.get_spool_data(sid)["name"]
+        return None
+
+    @property
+    def extra_state_attributes(self):
+        sid = self._coordinator.get_active_spool_id()
+        if sid:
+            d = self._coordinator.get_spool_data(sid)
+            return {
+                "material": d["material"],
+                "brand": d["brand"],
+                "color": d["color"],
+                "remaining_weight_g": d["remaining_weight_g"],
+                "remaining_pct": d["remaining_pct"],
+            }
+        return {}
+
+
+def make_spool_sensors(coordinator, printer_name, unique_prefix, spool_id):
+    return [
+        SpoolRemainingWeightSensor(coordinator, printer_name, unique_prefix, spool_id),
+        SpoolRemainingPctSensor(coordinator, printer_name, unique_prefix, spool_id),
+    ]

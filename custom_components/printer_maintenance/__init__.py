@@ -58,6 +58,53 @@ SET_TOTAL_FILAMENT_SCHEMA = vol.Schema(
     }
 )
 
+ADD_PLATE_SCHEMA = vol.Schema({
+    vol.Required("name"): cv.string,
+    vol.Optional("interval_hours", default=200): vol.All(vol.Coerce(float), vol.Range(min=1, max=10000)),
+    _ENTRY_ID_SCHEMA: cv.string,
+})
+
+REMOVE_PLATE_SCHEMA = vol.Schema({
+    vol.Required("plate_id"): cv.string,
+    _ENTRY_ID_SCHEMA: cv.string,
+})
+
+SET_ACTIVE_PLATE_SCHEMA = vol.Schema({
+    vol.Required("plate_id"): cv.string,
+    _ENTRY_ID_SCHEMA: cv.string,
+})
+
+RESET_PLATE_SCHEMA = vol.Schema({
+    vol.Required("plate_id"): cv.string,
+    _ENTRY_ID_SCHEMA: cv.string,
+})
+
+ADD_SPOOL_SCHEMA = vol.Schema({
+    vol.Required("name"): cv.string,
+    vol.Optional("material", default="PLA"): cv.string,
+    vol.Optional("brand", default=""): cv.string,
+    vol.Optional("color", default=""): cv.string,
+    vol.Optional("initial_weight_g", default=1000): vol.All(vol.Coerce(float), vol.Range(min=1, max=10000)),
+    vol.Optional("diameter_mm", default=1.75): vol.All(vol.Coerce(float), vol.Range(min=1.0, max=3.0)),
+    _ENTRY_ID_SCHEMA: cv.string,
+})
+
+REMOVE_SPOOL_SCHEMA = vol.Schema({
+    vol.Required("spool_id"): cv.string,
+    _ENTRY_ID_SCHEMA: cv.string,
+})
+
+SET_ACTIVE_SPOOL_SCHEMA = vol.Schema({
+    vol.Required("spool_id"): cv.string,
+    _ENTRY_ID_SCHEMA: cv.string,
+})
+
+UPDATE_SPOOL_WEIGHT_SCHEMA = vol.Schema({
+    vol.Required("spool_id"): cv.string,
+    vol.Required("remaining_weight_g"): vol.All(vol.Coerce(float), vol.Range(min=0, max=10000)),
+    _ENTRY_ID_SCHEMA: cv.string,
+})
+
 
 def _get_coordinator(
     hass: HomeAssistant, call: ServiceCall
@@ -102,7 +149,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Remove services when no entries remain
     if not hass.data[DOMAIN]:
-        for svc in ("reset_component", "set_interval", "add_hours", "set_total_hours", "set_total_filament"):
+        for svc in (
+            "reset_component", "set_interval", "add_hours", "set_total_hours", "set_total_filament",
+            "add_plate", "remove_plate", "set_active_plate", "reset_plate",
+            "add_spool", "remove_spool", "set_active_spool", "update_spool_weight",
+        ):
             hass.services.async_remove(DOMAIN, svc)
 
     return unloaded
@@ -143,6 +194,54 @@ def _register_services(hass: HomeAssistant) -> None:
         for coord in _get_coordinator(hass, call):
             await coord.async_set_total_filament(meters)
 
+    async def handle_add_plate(call: ServiceCall) -> None:
+        name = call.data["name"]
+        interval_hours = call.data["interval_hours"]
+        for coord in _get_coordinator(hass, call):
+            await coord.async_add_plate(name, interval_hours)
+
+    async def handle_remove_plate(call: ServiceCall) -> None:
+        plate_id = call.data["plate_id"]
+        for coord in _get_coordinator(hass, call):
+            await coord.async_remove_plate(plate_id)
+
+    async def handle_set_active_plate(call: ServiceCall) -> None:
+        plate_id = call.data["plate_id"]
+        for coord in _get_coordinator(hass, call):
+            await coord.async_set_active_plate(plate_id)
+
+    async def handle_reset_plate(call: ServiceCall) -> None:
+        plate_id = call.data["plate_id"]
+        for coord in _get_coordinator(hass, call):
+            await coord.async_reset_plate(plate_id)
+
+    async def handle_add_spool(call: ServiceCall) -> None:
+        for coord in _get_coordinator(hass, call):
+            await coord.async_add_spool(
+                name=call.data["name"],
+                material=call.data["material"],
+                brand=call.data["brand"],
+                color=call.data["color"],
+                initial_weight_g=call.data["initial_weight_g"],
+                diameter_mm=call.data["diameter_mm"],
+            )
+
+    async def handle_remove_spool(call: ServiceCall) -> None:
+        spool_id = call.data["spool_id"]
+        for coord in _get_coordinator(hass, call):
+            await coord.async_remove_spool(spool_id)
+
+    async def handle_set_active_spool(call: ServiceCall) -> None:
+        spool_id = call.data["spool_id"]
+        for coord in _get_coordinator(hass, call):
+            await coord.async_set_active_spool(spool_id)
+
+    async def handle_update_spool_weight(call: ServiceCall) -> None:
+        spool_id = call.data["spool_id"]
+        remaining_weight_g = call.data["remaining_weight_g"]
+        for coord in _get_coordinator(hass, call):
+            await coord.async_update_spool_weight(spool_id, remaining_weight_g)
+
     hass.services.async_register(
         DOMAIN, "reset_component", handle_reset_component, schema=RESET_COMPONENT_SCHEMA
     )
@@ -157,4 +256,28 @@ def _register_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(
         DOMAIN, "set_total_filament", handle_set_total_filament, schema=SET_TOTAL_FILAMENT_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "add_plate", handle_add_plate, schema=ADD_PLATE_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "remove_plate", handle_remove_plate, schema=REMOVE_PLATE_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "set_active_plate", handle_set_active_plate, schema=SET_ACTIVE_PLATE_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "reset_plate", handle_reset_plate, schema=RESET_PLATE_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "add_spool", handle_add_spool, schema=ADD_SPOOL_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "remove_spool", handle_remove_spool, schema=REMOVE_SPOOL_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "set_active_spool", handle_set_active_spool, schema=SET_ACTIVE_SPOOL_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "update_spool_weight", handle_update_spool_weight, schema=UPDATE_SPOOL_WEIGHT_SCHEMA
     )
