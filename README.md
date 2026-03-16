@@ -18,14 +18,14 @@ Designed first for the **Creality K1C** (with [`ha_creality_ws`](https://github.
 - **Real-time filament tracking** — accumulates filament consumption incrementally during printing
 - **Pause/resume support** — timer pauses with the printer, resumes transparently
 - **Job counting (OK / KO)** — per configurable state lists; ambiguous states (idle, standby) are ignored
-- **11 tracked components** with individually configurable maintenance intervals
+- **16 tracked components** with individually configurable maintenance intervals
 - **4 maintenance statuses**: `OK` · `Soon` · `Due` · `Overdue` (configurable alert threshold)
 - **Automatic HA persistent notifications** — fired when a component or plate reaches `Due` or `Overdue`, dismissed on reset
 - **Multi build-plate management** — unlimited plates (PEI smooth, PEI textured, PLA sheet…), only the active plate accumulates hours, per-plate status + last maintenance date + HA notifications
-- **Filament spool management** — track spools by material, brand, colour and weight; active spool weight auto-decrements from the filament sensor (g/m calculated from material density + diameter)
-- **51+ sensors** — 5 global + 44 per-component + 2 active-plate/spool indicators, then +4 per plate and +2 per spool added dynamically (no restart required)
+- **Filament spool management** — track spools by material, brand, colour and weight; active spool weight auto-decrements from the filament sensor (g/m calculated from material density + diameter); **remaining length (m)** auto-calculated per spool
+- **71+ sensors** — 5 global + 64 per-component + 2 active-plate/spool indicators, then +4 per plate and +3 per spool added dynamically (no restart required)
 - **Dynamic entities** — adding or removing a plate/spool registers/removes its sensors and buttons instantly
-- **11+ reset & control buttons** — 1 reset per component + 2 per plate (reset / activate) + 1 per spool (activate)
+- **16+ reset & control buttons** — 1 reset per component + 2 per plate (reset / activate) + 1 per spool (activate)
 - **13 services** — component counters, intervals, hours, filament, plates and spools
 - **Compact Lovelace card** — auto-registered, shows last maintenance date, plates section and spools section
 - **Persistent storage** — survives HA restarts, resumes in-progress sessions
@@ -47,6 +47,11 @@ Designed first for the **Creality K1C** (with [`ha_creality_ws`](https://github.
 | Cooling    | Hotend Fan        | 600 h           |
 | Cooling    | Part Cooling Fan  | 600 h           |
 | Misc       | PTFE Tube         | 400 h           |
+| Fasteners  | Hotend Screws     | 200 h           |
+| Fasteners  | Extruder Screws   | 300 h           |
+| Fasteners  | Gantry Screws     | 400 h           |
+| Fasteners  | Bed Screws        | 200 h           |
+| Fasteners  | Frame Screws      | 600 h           |
 
 ### Installation
 
@@ -122,7 +127,7 @@ The card displays:
 - Global stats: total print hours · filament used · jobs count
 - Per-component: progress bar, hours used / interval, status badge, **last maintenance date**
 - **Plates section**: active indicator (★), hours bar, status badge, last maintenance date, reset + activate buttons
-- **Spools section**: active indicator (★), colour dot, material badge, remaining weight bar, % remaining, activate button
+- **Spools section**: active indicator (★), colour dot, material badge, remaining weight bar, % remaining, remaining length (m), activate button
 
 ### Services
 
@@ -196,14 +201,14 @@ Conçue en priorité pour la **Creality K1C** (avec [`ha_creality_ws`](https://g
 - **Suivi du filament en temps réel** — accumulation incrémentale pendant l'impression
 - **Support pause/reprise** — le timer se suspend et reprend avec l'imprimante
 - **Comptage des jobs (OK / KO)** — basé sur des listes d'états configurables ; les états ambigus (idle, standby) sont ignorés
-- **11 composants suivis** avec intervalles de maintenance individuellement configurables
+- **16 composants suivis** avec intervalles de maintenance individuellement configurables
 - **4 statuts de maintenance** : `OK` · `Bientôt` · `Requis` · `En retard` (seuil d'alerte configurable)
 - **Notifications HA persistantes automatiques** — déclenchées quand un composant ou un plateau passe en `Requis` ou `En retard`, supprimées à la réinitialisation
 - **Gestion multi-plateaux** — plateaux illimités (PEI lisse, PEI texturé, feuille PLA…), seul le plateau actif accumule les heures, statut + date d'entretien + notifications par plateau
-- **Gestion des bobines de filament** — suivi par matière, marque, couleur et poids ; le poids du spool actif se décrémente automatiquement depuis le capteur filament (g/m calculé selon densité matière + diamètre)
-- **51+ capteurs** — 5 globaux + 44 par composant + 2 indicateurs plateau/spool actifs, puis +4 par plateau et +2 par bobine ajoutés dynamiquement (sans redémarrage)
+- **Gestion des bobines de filament** — suivi par matière, marque, couleur et poids ; le poids du spool actif se décrémente automatiquement depuis le capteur filament (g/m calculé selon densité matière + diamètre) ; **longueur restante (m)** calculée automatiquement par bobine
+- **71+ capteurs** — 5 globaux + 64 par composant + 2 indicateurs plateau/spool actifs, puis +4 par plateau et +3 par bobine ajoutés dynamiquement (sans redémarrage)
 - **Entités dynamiques** — l'ajout ou la suppression d'un plateau/bobine enregistre/supprime ses entités instantanément
-- **11+ boutons** — 1 reset par composant + 2 par plateau (reset / activer) + 1 par bobine (activer)
+- **16+ boutons** — 1 reset par composant + 2 par plateau (reset / activer) + 1 par bobine (activer)
 - **13 services** — compteurs composants, intervalles, heures, filament, plateaux et bobines
 - **Carte Lovelace compacte** — enregistrée automatiquement, date d'entretien, section plateaux et section bobines
 - **Stockage persistant** — résiste aux redémarrages HA, reprend les sessions en cours
@@ -225,6 +230,11 @@ Conçue en priorité pour la **Creality K1C** (avec [`ha_creality_ws`](https://g
 | Refroid.   | Ventilateur hotend  | 600 h                 |
 | Refroid.   | Ventilateur pièce   | 600 h                 |
 | Divers     | Tube PTFE           | 400 h                 |
+| Visserie   | Vis hotend          | 200 h                 |
+| Visserie   | Vis extrudeur       | 300 h                 |
+| Visserie   | Vis gantry          | 400 h                 |
+| Visserie   | Vis plateau         | 200 h                 |
+| Visserie   | Vis châssis         | 600 h                 |
 
 ### Installation
 
@@ -300,7 +310,7 @@ La carte affiche :
 - Statistiques globales : heures totales · filament utilisé · nombre de jobs
 - Par composant : barre de progression, heures utilisées / intervalle, badge de statut, **date du dernier entretien**
 - **Section plateaux** : indicateur actif (★), barre d'heures, badge statut, date dernier entretien, boutons reset + activer
-- **Section bobines** : indicateur actif (★), point couleur, badge matière, barre poids restant, % restant, bouton activer
+- **Section bobines** : indicateur actif (★), point couleur, badge matière, barre poids restant, % restant, longueur restante (m), bouton activer
 
 ### Services
 
