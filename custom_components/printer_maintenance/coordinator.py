@@ -539,14 +539,18 @@ class PrinterMaintenanceCoordinator:
     def _slugify(name: str) -> str:
         return re.sub(r'[^a-z0-9]+', '_', name.lower().strip()).strip('_')
 
-    def _grams_from_meters(self, spool_id: str, meters: float) -> float:
-        spool = self._data.get("spools", {}).get(spool_id, {})
-        material = spool.get("material", "PLA")
-        diameter_mm = spool.get("diameter_mm", DEFAULT_FILAMENT_DIAMETER_MM)
+    @staticmethod
+    def _grams_per_meter(s: dict) -> float:
+        """Return grams per meter of filament for a spool config dict."""
+        material = s.get("material", "PLA")
+        diameter_mm = s.get("diameter_mm", DEFAULT_FILAMENT_DIAMETER_MM)
         density = MATERIAL_DENSITIES.get(material, MATERIAL_DENSITIES["Other"])
         radius_cm = (diameter_mm / 2.0) / 10.0
-        volume_per_m = math.pi * radius_cm ** 2 * 100.0
-        return meters * volume_per_m * density
+        return math.pi * radius_cm ** 2 * 100.0 * density
+
+    def _grams_from_meters(self, spool_id: str, meters: float) -> float:
+        s = self._data.get("spools", {}).get(spool_id, {})
+        return meters * self._grams_per_meter(s)
 
     # ------------------------------------------------------------------
     # Plate methods
@@ -672,23 +676,22 @@ class PrinterMaintenanceCoordinator:
         initial = s.get("initial_weight_g", 1000.0)
         remaining = s.get("remaining_weight_g", initial)
         pct = round(remaining / initial * 100, 1) if initial > 0 else 0.0
-        material = s.get("material", "PLA")
-        diameter_mm = s.get("diameter_mm", DEFAULT_FILAMENT_DIAMETER_MM)
-        density = MATERIAL_DENSITIES.get(material, MATERIAL_DENSITIES["Other"])
-        radius_cm = (diameter_mm / 2.0) / 10.0
-        volume_per_m = math.pi * radius_cm ** 2 * 100.0
-        grams_per_m = volume_per_m * density
-        remaining_length_m = round(remaining / grams_per_m, 1) if grams_per_m > 0 else 0.0
-        initial_length_m = round(initial / grams_per_m, 1) if grams_per_m > 0 else 0.0
+        grams_per_m = self._grams_per_meter(s)
+        if grams_per_m > 0:
+            remaining_length_m = round(remaining / grams_per_m, 1)
+            initial_length_m = round(initial / grams_per_m, 1)
+        else:
+            remaining_length_m = 0.0
+            initial_length_m = 0.0
         return {
             "name": s.get("name", spool_id),
-            "material": material,
+            "material": s.get("material", "PLA"),
             "color": s.get("color", ""),
             "brand": s.get("brand", ""),
             "initial_weight_g": round(initial, 0),
             "remaining_weight_g": round(remaining, 1),
             "remaining_pct": pct,
-            "diameter_mm": diameter_mm,
+            "diameter_mm": s.get("diameter_mm", DEFAULT_FILAMENT_DIAMETER_MM),
             "remaining_length_m": remaining_length_m,
             "initial_length_m": initial_length_m,
             "active": s.get("active", False),

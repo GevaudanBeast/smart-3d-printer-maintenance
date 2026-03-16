@@ -532,15 +532,6 @@ class SpoolRemainingLengthSensor(_BaseSpoolSensor):
     def native_value(self):
         return self._spool()["remaining_length_m"]
 
-    @property
-    def extra_state_attributes(self):
-        d = self._spool()
-        return {
-            "initial_length_m": d["initial_length_m"],
-            "material": d["material"],
-            "diameter_mm": d["diameter_mm"],
-        }
-
 
 def make_spool_sensors(coordinator, printer_name, unique_prefix, spool_id):
     return [
