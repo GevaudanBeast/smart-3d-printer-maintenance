@@ -59,6 +59,8 @@ class PrinterMaintenanceCard extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this._config = {};
     this._hass   = null;
+    // Track inline interval edit: { compId, type: 'maintenance'|'greasing' }
+    this._editState = null;
   }
 
   // Called once by HA when the card is first rendered
@@ -75,7 +77,8 @@ class PrinterMaintenanceCard extends HTMLElement {
   // Called every time HA state changes
   set hass(hass) {
     this._hass = hass;
-    this._render();
+    // Don't clobber an in-progress interval edit on every HA state update
+    if (!this._editState) this._render();
   }
 
   // ── helpers ────────────────────────────────────────────────────────────────
@@ -111,6 +114,32 @@ class PrinterMaintenanceCard extends HTMLElement {
     await this._hass.callService("button", "press", {
       entity_id: `button.${this._config.printer}_grease_${comp}`,
     });
+  }
+
+  _startEdit(compId, type) {
+    this._editState = { compId, type };
+    this._render();
+    // Focus the input after render
+    requestAnimationFrame(() => {
+      const inp = this.shadowRoot.querySelector(`#int-${compId}-${type[0]}`);
+      if (inp) { inp.focus(); inp.select(); }
+    });
+  }
+
+  _cancelEdit() {
+    this._editState = null;
+    this._render();
+  }
+
+  async _saveInterval(compId, type) {
+    const inp = this.shadowRoot.querySelector(`#int-${compId}-${type[0]}`);
+    if (!inp) return;
+    const hours = parseFloat(inp.value);
+    if (isNaN(hours) || hours < 1 || hours > 10000) { this._cancelEdit(); return; }
+    const service = type === "greasing" ? "set_greasing_interval" : "set_interval";
+    await this._hass.callService("printer_maintenance", service, { component: compId, interval_hours: hours });
+    this._editState = null;
+    this._render();
   }
 
   async _pressButton(entityId) {
@@ -157,6 +186,21 @@ class PrinterMaintenanceCard extends HTMLElement {
           ? `<span class="last-date">${new Date(lastReset).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })}</span>`
           : `<span class="last-date never">—</span>`;
 
+        // Inline edit state flags
+        const editingM = this._editState?.compId === comp.id && this._editState?.type === "maintenance";
+        const editingG = this._editState?.compId === comp.id && this._editState?.type === "greasing";
+
+        // Maintenance time column + action column
+        const mTimeHtml = editingM
+          ? `<span class="comp-time"><input id="int-${comp.id}-m" class="int-input" type="number" min="1" max="10000" value="${interval.toFixed(0)}"></span>`
+          : `<span class="comp-time">${used.toFixed(0)}<span class="dim">/${interval.toFixed(0)}h</span></span>`;
+        const mBadgeHtml = editingM
+          ? `<span class="edit-actions"><button class="ok-btn" data-comp="${comp.id}" data-type="maintenance">✓</button><button class="cancel-btn">✗</button></span>`
+          : `<span class="badge" style="color:${sc.color}">${sc.label}</span>`;
+        const mActionHtml = editingM
+          ? ``
+          : `<span class="row-actions"><button class="rbtn" data-comp="${comp.id}" title="Reset ${comp.name}">↺</button><button class="edit-btn" data-comp="${comp.id}" data-type="maintenance" title="Edit maintenance interval">✎</button></span>`;
+
         // Greasing sub-row (greasable components only)
         let greasingHtml = "";
         if (comp.greasable) {
@@ -170,6 +214,17 @@ class PrinterMaintenanceCard extends HTMLElement {
           const gDateHtml   = lastGreasing
             ? `<span class="last-date">${new Date(lastGreasing).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })}</span>`
             : `<span class="last-date never">—</span>`;
+
+          const gTimeHtml = editingG
+            ? `<span class="comp-time"><input id="int-${comp.id}-g" class="int-input" type="number" min="1" max="10000" value="${gInterval.toFixed(0)}"></span>`
+            : `<span class="comp-time">${gUsed.toFixed(0)}<span class="dim">/${gInterval.toFixed(0)}h</span></span>`;
+          const gBadgeHtml = editingG
+            ? `<span class="edit-actions"><button class="ok-btn" data-comp="${comp.id}" data-type="greasing">✓</button><button class="cancel-btn">✗</button></span>`
+            : `<span class="badge" style="color:${gsc.color}">${gsc.label}</span>`;
+          const gActionHtml = editingG
+            ? ``
+            : `<span class="row-actions"><button class="gbtn" data-comp="${comp.id}" title="Grease ${comp.name}">💧</button><button class="edit-btn" data-comp="${comp.id}" data-type="greasing" title="Edit greasing interval">✎</button></span>`;
+
           greasingHtml = `
           <div class="grease-row">
             <div class="comp-name-wrap">
@@ -179,9 +234,9 @@ class PrinterMaintenanceCard extends HTMLElement {
             <div class="bar grease-bar">
               <div class="bar-fill" style="width:${gPct}%;background:${gsc.color}"></div>
             </div>
-            <span class="comp-time">${gUsed.toFixed(0)}<span class="dim">/${gInterval.toFixed(0)}h</span></span>
-            <span class="badge" style="color:${gsc.color}">${gsc.label}</span>
-            <button class="gbtn" data-comp="${comp.id}" title="Grease ${comp.name}">💧</button>
+            ${gTimeHtml}
+            ${gBadgeHtml}
+            ${gActionHtml}
           </div>`;
         }
 
@@ -194,9 +249,9 @@ class PrinterMaintenanceCard extends HTMLElement {
             <div class="bar">
               <div class="bar-fill" style="width:${pct}%;background:${sc.color}"></div>
             </div>
-            <span class="comp-time">${used.toFixed(0)}<span class="dim">/${interval.toFixed(0)}h</span></span>
-            <span class="badge" style="color:${sc.color}">${sc.label}</span>
-            <button class="rbtn" data-comp="${comp.id}" title="Reset ${comp.name}">↺</button>
+            ${mTimeHtml}
+            ${mBadgeHtml}
+            ${mActionHtml}
           </div>
           ${greasingHtml}`;
       }
@@ -363,7 +418,7 @@ class PrinterMaintenanceCard extends HTMLElement {
         /* ── component row ── */
         .comp-row {
           display: grid;
-          grid-template-columns: 108px 1fr 66px 52px 22px;
+          grid-template-columns: 108px 1fr 66px 52px 38px;
           align-items: center;
           gap: 6px;
           padding: 2px 0;
@@ -457,7 +512,7 @@ class PrinterMaintenanceCard extends HTMLElement {
         /* ── greasing sub-row ── */
         .grease-row {
           display: grid;
-          grid-template-columns: 108px 1fr 66px 52px 22px;
+          grid-template-columns: 108px 1fr 66px 52px 38px;
           align-items: center;
           gap: 6px;
           padding: 1px 0 3px;
@@ -481,6 +536,61 @@ class PrinterMaintenanceCard extends HTMLElement {
           transition: opacity .15s, transform .2s;
         }
         .gbtn:hover { opacity: 1; transform: scale(1.3); }
+
+        /* ── row actions (reset + edit) ── */
+        .row-actions {
+          display: flex;
+          gap: 2px;
+          align-items: center;
+        }
+
+        /* ── inline interval edit ── */
+        .edit-btn {
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: var(--secondary-text-color, #aaa);
+          font-size: 0.75em;
+          line-height: 1;
+          padding: 0;
+          opacity: 0;
+          transition: opacity .15s;
+        }
+        .comp-row:hover .edit-btn,
+        .grease-row:hover .edit-btn { opacity: .45; }
+        .edit-btn:hover { opacity: 1 !important; }
+
+        .int-input {
+          width: 52px;
+          background: var(--secondary-background-color, rgba(255,255,255,.08));
+          border: 1px solid var(--primary-color, #03a9f4);
+          border-radius: 4px;
+          color: var(--primary-text-color);
+          font-size: 0.75em;
+          padding: 1px 3px;
+          text-align: right;
+          -moz-appearance: textfield;
+        }
+        .int-input::-webkit-inner-spin-button { display: none; }
+
+        .edit-actions {
+          display: flex;
+          gap: 2px;
+          align-items: center;
+        }
+        .ok-btn, .cancel-btn {
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-size: 0.85em;
+          line-height: 1;
+          padding: 0;
+          opacity: .7;
+          transition: opacity .15s;
+        }
+        .ok-btn { color: var(--success-color, #4CAF50); }
+        .cancel-btn { color: var(--error-color, #F44336); }
+        .ok-btn:hover, .cancel-btn:hover { opacity: 1; }
 
         /* ── spool row ── */
         .spool-row {
@@ -566,6 +676,41 @@ class PrinterMaintenanceCard extends HTMLElement {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         this._grease(btn.dataset.comp);
+      });
+    });
+
+    // attach edit-interval button listeners
+    this.shadowRoot.querySelectorAll(".edit-btn[data-comp]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this._startEdit(btn.dataset.comp, btn.dataset.type);
+      });
+    });
+
+    // attach save listeners
+    this.shadowRoot.querySelectorAll(".ok-btn[data-comp]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this._saveInterval(btn.dataset.comp, btn.dataset.type);
+      });
+    });
+
+    // attach cancel listeners
+    this.shadowRoot.querySelectorAll(".cancel-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this._cancelEdit();
+      });
+    });
+
+    // keyboard: Enter = save, Escape = cancel
+    this.shadowRoot.querySelectorAll(".int-input").forEach((inp) => {
+      inp.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && this._editState) {
+          this._saveInterval(this._editState.compId, this._editState.type);
+        } else if (e.key === "Escape") {
+          this._cancelEdit();
+        }
       });
     });
   }
