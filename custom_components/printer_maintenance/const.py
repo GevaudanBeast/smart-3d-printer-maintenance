@@ -142,4 +142,35 @@ COMPONENTS: dict[str, dict] = {
         "icon": "mdi:pipe",
         "category": "misc",
     },
+    # Fasteners
+    "hotend_screws": {
+        "name": "Hotend Screws",
+        "default_interval": 200,
+        "icon": "mdi:screw-flat-top",
+        "category": "fasteners",
+    },
+    "extruder_screws": {
+        "name": "Extruder Screws",
+        "default_interval": 300,
+        "icon": "mdi:screw-flat-top",
+        "category": "fasteners",
+    },
+    "gantry_screws": {
+        "name": "Gantry Screws",
+        "default_interval": 400,
+        "icon": "mdi:screw-machine-flat-top",
+        "category": "fasteners",
+    },
+    "bed_screws": {
+        "name": "Bed Screws",
+        "default_interval": 200,
+        "icon": "mdi:screw-round-top",
+        "category": "fasteners",
+    },
+    "frame_screws": {
+        "name": "Frame Screws",
+        "default_interval": 600,
+        "icon": "mdi:screw-lag",
+        "category": "fasteners",
+    },
 }
