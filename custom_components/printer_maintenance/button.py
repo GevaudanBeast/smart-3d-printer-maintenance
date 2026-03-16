@@ -23,12 +23,24 @@ async def async_setup_entry(
     printer_name = entry.data.get(CONF_PRINTER_NAME, "Printer")
     unique_prefix = entry.entry_id
 
-    async_add_entities(
-        [
-            ResetComponentButton(coordinator, printer_name, unique_prefix, comp_id, comp_info)
-            for comp_id, comp_info in COMPONENTS.items()
-        ]
-    )
+    buttons = [
+        ResetComponentButton(coordinator, printer_name, unique_prefix, comp_id, comp_info)
+        for comp_id, comp_info in COMPONENTS.items()
+    ]
+
+    # Existing plates
+    for plate_id, plate_info in coordinator.get_all_plates().items():
+        buttons += make_plate_buttons(coordinator, printer_name, unique_prefix, plate_id, plate_info.get("name", plate_id))
+
+    # Existing spools
+    for spool_id, spool_info in coordinator.get_all_spools().items():
+        buttons += make_spool_buttons(coordinator, printer_name, unique_prefix, spool_id, spool_info.get("name", spool_id))
+
+    async_add_entities(buttons)
+
+    # Store callbacks for dynamic registration
+    coordinator._plate_button_add_fn = async_add_entities
+    coordinator._spool_button_add_fn = async_add_entities
 
 
 class ResetComponentButton(ButtonEntity):
@@ -58,3 +70,76 @@ class ResetComponentButton(ButtonEntity):
 
     async def async_press(self) -> None:
         await self._coordinator.async_reset_component(self._comp_id)
+
+
+class PlateResetButton(ButtonEntity):
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator, printer_name, unique_prefix, plate_id, plate_name):
+        self._coordinator = coordinator
+        self._plate_id = plate_id
+        self._attr_unique_id = f"{unique_prefix}_reset_plate_{plate_id}"
+        self._attr_name = f"Reset Plate {plate_name}"
+        self._attr_icon = "mdi:restore"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, unique_prefix)},
+            name=printer_name,
+            manufacturer="Printer Maintenance",
+        )
+
+    async def async_press(self):
+        await self._coordinator.async_reset_plate(self._plate_id)
+
+
+class PlateActivateButton(ButtonEntity):
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator, printer_name, unique_prefix, plate_id, plate_name):
+        self._coordinator = coordinator
+        self._plate_id = plate_id
+        self._attr_unique_id = f"{unique_prefix}_activate_plate_{plate_id}"
+        self._attr_name = f"Activate Plate {plate_name}"
+        self._attr_icon = "mdi:layers-plus"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, unique_prefix)},
+            name=printer_name,
+            manufacturer="Printer Maintenance",
+        )
+
+    async def async_press(self):
+        await self._coordinator.async_set_active_plate(self._plate_id)
+
+
+class SpoolActivateButton(ButtonEntity):
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator, printer_name, unique_prefix, spool_id, spool_name):
+        self._coordinator = coordinator
+        self._spool_id = spool_id
+        self._attr_unique_id = f"{unique_prefix}_activate_spool_{spool_id}"
+        self._attr_name = f"Activate Spool {spool_name}"
+        self._attr_icon = "mdi:spool"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, unique_prefix)},
+            name=printer_name,
+            manufacturer="Printer Maintenance",
+        )
+
+    async def async_press(self):
+        await self._coordinator.async_set_active_spool(self._spool_id)
+
+
+def make_plate_buttons(coordinator, printer_name, unique_prefix, plate_id, plate_name):
+    return [
+        PlateResetButton(coordinator, printer_name, unique_prefix, plate_id, plate_name),
+        PlateActivateButton(coordinator, printer_name, unique_prefix, plate_id, plate_name),
+    ]
+
+
+def make_spool_buttons(coordinator, printer_name, unique_prefix, spool_id, spool_name):
+    return [
+        SpoolActivateButton(coordinator, printer_name, unique_prefix, spool_id, spool_name),
+    ]

@@ -159,3 +159,214 @@ add_hours:
       required: false
       selector:
         text:
+
+add_plate:
+  name: Add Build Plate
+  description: >
+    Add a new build plate (build surface) with its own usage counter and
+    maintenance interval.
+  fields:
+    name:
+      name: Name
+      description: Display name for the plate (e.g. "PEI Smooth", "PEI Textured").
+      required: true
+      selector:
+        text:
+    interval_hours:
+      name: Interval (hours)
+      description: Maintenance/replacement threshold in print hours. Default 200 h.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 10000
+          step: 1
+          unit_of_measurement: h
+    entry_id:
+      name: Printer (entry ID)
+      description: Config entry ID of the target printer. Leave empty for all.
+      required: false
+      selector:
+        text:
+
+remove_plate:
+  name: Remove Build Plate
+  description: Remove a build plate and its associated entities.
+  fields:
+    plate_id:
+      name: Plate ID
+      description: The internal ID of the plate to remove (slugified name).
+      required: true
+      selector:
+        text:
+    entry_id:
+      name: Printer (entry ID)
+      description: Config entry ID of the target printer. Leave empty for all.
+      required: false
+      selector:
+        text:
+
+set_active_plate:
+  name: Set Active Plate
+  description: >
+    Mark a plate as the currently active build surface. Only the active plate
+    accumulates print hours.
+  fields:
+    plate_id:
+      name: Plate ID
+      description: The internal ID of the plate to activate.
+      required: true
+      selector:
+        text:
+    entry_id:
+      name: Printer (entry ID)
+      description: Config entry ID of the target printer. Leave empty for all.
+      required: false
+      selector:
+        text:
+
+reset_plate:
+  name: Reset Plate Counter
+  description: >
+    Reset the hours counter for a build plate (e.g. after cleaning or replacing).
+  fields:
+    plate_id:
+      name: Plate ID
+      description: The internal ID of the plate to reset.
+      required: true
+      selector:
+        text:
+    entry_id:
+      name: Printer (entry ID)
+      description: Config entry ID of the target printer. Leave empty for all.
+      required: false
+      selector:
+        text:
+
+add_spool:
+  name: Add Filament Spool
+  description: Add a new filament spool to track its remaining weight.
+  fields:
+    name:
+      name: Name
+      description: Display name for the spool (e.g. "PLA White Bambu").
+      required: true
+      selector:
+        text:
+    material:
+      name: Material
+      description: Filament material type. Default PLA.
+      required: false
+      selector:
+        select:
+          options:
+            - PLA
+            - PETG
+            - ABS
+            - ASA
+            - TPU
+            - Nylon
+            - PC
+            - Other
+    brand:
+      name: Brand
+      description: Filament brand name.
+      required: false
+      selector:
+        text:
+    color:
+      name: Color
+      description: Filament color.
+      required: false
+      selector:
+        text:
+    initial_weight_g:
+      name: Initial Weight (g)
+      description: Net weight of filament on the spool in grams. Default 1000 g.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 10000
+          step: 1
+          unit_of_measurement: g
+    diameter_mm:
+      name: Diameter (mm)
+      description: Filament diameter in mm. Default 1.75 mm.
+      required: false
+      selector:
+        number:
+          min: 1.0
+          max: 3.0
+          step: 0.05
+          unit_of_measurement: mm
+    entry_id:
+      name: Printer (entry ID)
+      description: Config entry ID of the target printer. Leave empty for all.
+      required: false
+      selector:
+        text:
+
+remove_spool:
+  name: Remove Filament Spool
+  description: Remove a filament spool and its associated entities.
+  fields:
+    spool_id:
+      name: Spool ID
+      description: The internal ID of the spool to remove (slugified name).
+      required: true
+      selector:
+        text:
+    entry_id:
+      name: Printer (entry ID)
+      description: Config entry ID of the target printer. Leave empty for all.
+      required: false
+      selector:
+        text:
+
+set_active_spool:
+  name: Set Active Spool
+  description: >
+    Mark a spool as the currently loaded filament. Only the active spool's
+    remaining weight is decremented during printing.
+  fields:
+    spool_id:
+      name: Spool ID
+      description: The internal ID of the spool to activate.
+      required: true
+      selector:
+        text:
+    entry_id:
+      name: Printer (entry ID)
+      description: Config entry ID of the target printer. Leave empty for all.
+      required: false
+      selector:
+        text:
+
+update_spool_weight:
+  name: Update Spool Remaining Weight
+  description: >
+    Manually set the remaining filament weight for a spool (e.g. after weighing it).
+  fields:
+    spool_id:
+      name: Spool ID
+      description: The internal ID of the spool to update.
+      required: true
+      selector:
+        text:
+    remaining_weight_g:
+      name: Remaining Weight (g)
+      description: Current remaining filament weight in grams.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 10000
+          step: 1
+          unit_of_measurement: g
+    entry_id:
+      name: Printer (entry ID)
+      description: Config entry ID of the target printer. Leave empty for all.
+      required: false
+      selector:
+        text:
