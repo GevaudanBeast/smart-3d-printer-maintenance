@@ -23,10 +23,11 @@ Designed first for the **Creality K1C** (with [`ha_creality_ws`](https://github.
 - **Automatic HA persistent notifications** — fired when a component or plate reaches `Due` or `Overdue`, dismissed on reset
 - **Multi build-plate management** — unlimited plates (PEI smooth, PEI textured, PLA sheet…), only the active plate accumulates hours, per-plate status + last maintenance date + HA notifications
 - **Filament spool management** — track spools by material, brand, colour and weight; active spool weight auto-decrements from the filament sensor (g/m calculated from material density + diameter); **remaining length (m)** auto-calculated per spool
-- **71+ sensors** — 5 global + 64 per-component + 2 active-plate/spool indicators, then +4 per plate and +3 per spool added dynamically (no restart required)
+- **Per-component greasing tracking** — 4 components with dedicated greasing interval (independent from maintenance), date of last greasing, status (OK / Soon / Due / Overdue), HA notification on due/overdue, 💧 Grease button in Lovelace card
+- **79+ sensors** — 5 global + 72 per-component (4 maintenance + 2 greasing × 4 greasable) + 2 active-plate/spool indicators, then +4 per plate and +3 per spool added dynamically (no restart required)
 - **Dynamic entities** — adding or removing a plate/spool registers/removes its sensors and buttons instantly
-- **16+ reset & control buttons** — 1 reset per component + 2 per plate (reset / activate) + 1 per spool (activate)
-- **13 services** — component counters, intervals, hours, filament, plates and spools
+- **20+ reset & control buttons** — 1 reset + 1 grease per greasable component, 1 reset per other component, 2 per plate (reset / activate), 1 per spool (activate)
+- **15 services** — component counters, intervals, greasing, hours, filament, plates and spools
 - **Compact Lovelace card** — auto-registered, shows last maintenance date, plates section and spools section
 - **Persistent storage** — survives HA restarts, resumes in-progress sessions
 - **Multi-printer** — one integration entry per printer
@@ -34,24 +35,24 @@ Designed first for the **Creality K1C** (with [`ha_creality_ws`](https://github.
 
 ### Tracked Components
 
-| Category   | Component         | Default interval |
-|------------|-------------------|-----------------|
-| Extrusion  | Nozzle            | 300 h           |
-| Extrusion  | Heatbreak         | 500 h           |
-| Extrusion  | Extruder Gear     | 400 h           |
-| Movement   | Belts             | 800 h           |
-| Movement   | Linear Rods       | 600 h           |
-| Movement   | Linear Rails      | 600 h           |
-| Platform   | Build Plate       | 1 000 h         |
-| Platform   | Build Surface     | 200 h           |
-| Cooling    | Hotend Fan        | 600 h           |
-| Cooling    | Part Cooling Fan  | 600 h           |
-| Misc       | PTFE Tube         | 400 h           |
-| Fasteners  | Hotend Screws     | 200 h           |
-| Fasteners  | Extruder Screws   | 300 h           |
-| Fasteners  | Gantry Screws     | 400 h           |
-| Fasteners  | Bed Screws        | 200 h           |
-| Fasteners  | Frame Screws      | 600 h           |
+| Category   | Component         | Maintenance interval | Greasing interval |
+|------------|-------------------|---------------------|-------------------|
+| Extrusion  | Nozzle            | 300 h               | —                 |
+| Extrusion  | Heatbreak         | 500 h               | —                 |
+| Extrusion  | Extruder Gear     | 400 h               | 100 h 💧          |
+| Movement   | Belts             | 800 h               | 300 h 💧          |
+| Movement   | Linear Rods       | 600 h               | 100 h 💧          |
+| Movement   | Linear Rails      | 600 h               | 150 h 💧          |
+| Platform   | Build Plate       | 1 000 h             | —                 |
+| Platform   | Build Surface     | 200 h               | —                 |
+| Cooling    | Hotend Fan        | 600 h               | —                 |
+| Cooling    | Part Cooling Fan  | 600 h               | —                 |
+| Misc       | PTFE Tube         | 400 h               | —                 |
+| Fasteners  | Hotend Screws     | 200 h               | —                 |
+| Fasteners  | Extruder Screws   | 300 h               | —                 |
+| Fasteners  | Gantry Screws     | 400 h               | —                 |
+| Fasteners  | Bed Screws        | 200 h               | —                 |
+| Fasteners  | Frame Screws      | 600 h               | —                 |
 
 ### Installation
 
@@ -125,7 +126,7 @@ spools:                         # optional — list of spool IDs to display
 
 The card displays:
 - Global stats: total print hours · filament used · jobs count
-- Per-component: progress bar, hours used / interval, status badge, **last maintenance date**
+- Per-component: progress bar, hours used / interval, status badge, **last maintenance date**; greasable components show an extra greasing sub-row (💧 progress bar, hours/interval, status, Grease button)
 - **Plates section**: active indicator (★), hours bar, status badge, last maintenance date, reset + activate buttons
 - **Spools section**: active indicator (★), colour dot, material badge, remaining weight bar, % remaining, remaining length (m), activate button
 
@@ -137,6 +138,8 @@ The card displays:
 |---------|-----------|-------------|
 | `printer_maintenance.reset_component` | `component`, `entry_id` *(opt)* | Reset a component counter after maintenance |
 | `printer_maintenance.set_interval` | `component`, `interval_hours`, `entry_id` *(opt)* | Update a maintenance interval |
+| `printer_maintenance.grease_component` | `component`, `entry_id` *(opt)* | Record a greasing event (greasable components only) |
+| `printer_maintenance.set_greasing_interval` | `component`, `interval_hours`, `entry_id` *(opt)* | Update a greasing interval (greasable components only) |
 | `printer_maintenance.add_hours` | `hours`, `component` *(opt)*, `entry_id` *(opt)* | Manually add print hours |
 | `printer_maintenance.set_total_hours` | `hours`, `entry_id` *(opt)* | Set the global print-hour total |
 | `printer_maintenance.set_total_filament` | `meters`, `entry_id` *(opt)* | Set the global filament total |
@@ -182,7 +185,7 @@ The threshold is configurable per integration entry (Options → "Soon" alert th
 - [x] Automatic HA notifications on status change
 - [x] Multi build-plate management (per-plate hours, status, last maintenance)
 - [x] Filament spool management (material, brand, weight auto-decrement)
-- [ ] Per-component greasing tracking: dedicated greasing date + configurable greasing interval (separate from the general maintenance interval)
+- [x] Per-component greasing tracking: dedicated greasing date + configurable greasing interval (separate from the general maintenance interval)
 - [ ] OctoPrint / Moonraker / Klipper connectors
 
 ---
@@ -206,10 +209,11 @@ Conçue en priorité pour la **Creality K1C** (avec [`ha_creality_ws`](https://g
 - **Notifications HA persistantes automatiques** — déclenchées quand un composant ou un plateau passe en `Requis` ou `En retard`, supprimées à la réinitialisation
 - **Gestion multi-plateaux** — plateaux illimités (PEI lisse, PEI texturé, feuille PLA…), seul le plateau actif accumule les heures, statut + date d'entretien + notifications par plateau
 - **Gestion des bobines de filament** — suivi par matière, marque, couleur et poids ; le poids du spool actif se décrémente automatiquement depuis le capteur filament (g/m calculé selon densité matière + diamètre) ; **longueur restante (m)** calculée automatiquement par bobine
-- **71+ capteurs** — 5 globaux + 64 par composant + 2 indicateurs plateau/spool actifs, puis +4 par plateau et +3 par bobine ajoutés dynamiquement (sans redémarrage)
+- **Suivi du graissage par composant** — 4 composants avec intervalle de graissage dédié (distinct de la maintenance), date du dernier graissage, statut (OK / Bientôt / Requis / En retard), notification HA, bouton 💧 Graisser dans la carte Lovelace
+- **79+ capteurs** — 5 globaux + 72 par composant (4 maintenance + 2 graissage × 4 composants graissables) + 2 indicateurs plateau/spool actifs, puis +4 par plateau et +3 par bobine ajoutés dynamiquement (sans redémarrage)
 - **Entités dynamiques** — l'ajout ou la suppression d'un plateau/bobine enregistre/supprime ses entités instantanément
-- **16+ boutons** — 1 reset par composant + 2 par plateau (reset / activer) + 1 par bobine (activer)
-- **13 services** — compteurs composants, intervalles, heures, filament, plateaux et bobines
+- **20+ boutons** — 1 reset + 1 graisser par composant graissable, 1 reset par autre composant, 2 par plateau (reset / activer), 1 par bobine (activer)
+- **15 services** — compteurs composants, intervalles, graissage, heures, filament, plateaux et bobines
 - **Carte Lovelace compacte** — enregistrée automatiquement, date d'entretien, section plateaux et section bobines
 - **Stockage persistant** — résiste aux redémarrages HA, reprend les sessions en cours
 - **Multi-imprimantes** — une entrée d'intégration par imprimante
@@ -217,24 +221,24 @@ Conçue en priorité pour la **Creality K1C** (avec [`ha_creality_ws`](https://g
 
 ### Composants suivis
 
-| Catégorie  | Composant           | Intervalle par défaut |
-|------------|---------------------|-----------------------|
-| Extrusion  | Buse                | 300 h                 |
-| Extrusion  | Heatbreak           | 500 h                 |
-| Extrusion  | Engrenage extrudeur | 400 h                 |
-| Mouvement  | Courroies           | 800 h                 |
-| Mouvement  | Tiges linéaires     | 600 h                 |
-| Mouvement  | Rails linéaires     | 600 h                 |
-| Plateau    | Plateau d'impression| 1 000 h               |
-| Plateau    | Surface d'impression| 200 h                 |
-| Refroid.   | Ventilateur hotend  | 600 h                 |
-| Refroid.   | Ventilateur pièce   | 600 h                 |
-| Divers     | Tube PTFE           | 400 h                 |
-| Visserie   | Vis hotend          | 200 h                 |
-| Visserie   | Vis extrudeur       | 300 h                 |
-| Visserie   | Vis gantry          | 400 h                 |
-| Visserie   | Vis plateau         | 200 h                 |
-| Visserie   | Vis châssis         | 600 h                 |
+| Catégorie  | Composant           | Intervalle maintenance | Intervalle graissage |
+|------------|---------------------|------------------------|----------------------|
+| Extrusion  | Buse                | 300 h                  | —                    |
+| Extrusion  | Heatbreak           | 500 h                  | —                    |
+| Extrusion  | Engrenage extrudeur | 400 h                  | 100 h 💧             |
+| Mouvement  | Courroies           | 800 h                  | 300 h 💧             |
+| Mouvement  | Tiges linéaires     | 600 h                  | 100 h 💧             |
+| Mouvement  | Rails linéaires     | 600 h                  | 150 h 💧             |
+| Plateau    | Plateau d'impression| 1 000 h                | —                    |
+| Plateau    | Surface d'impression| 200 h                  | —                    |
+| Refroid.   | Ventilateur hotend  | 600 h                  | —                    |
+| Refroid.   | Ventilateur pièce   | 600 h                  | —                    |
+| Divers     | Tube PTFE           | 400 h                  | —                    |
+| Visserie   | Vis hotend          | 200 h                  | —                    |
+| Visserie   | Vis extrudeur       | 300 h                  | —                    |
+| Visserie   | Vis gantry          | 400 h                  | —                    |
+| Visserie   | Vis plateau         | 200 h                  | —                    |
+| Visserie   | Vis châssis         | 600 h                  | —                    |
 
 ### Installation
 
@@ -308,7 +312,7 @@ spools:                         # optionnel — liste des IDs de bobines à affi
 
 La carte affiche :
 - Statistiques globales : heures totales · filament utilisé · nombre de jobs
-- Par composant : barre de progression, heures utilisées / intervalle, badge de statut, **date du dernier entretien**
+- Par composant : barre de progression, heures utilisées / intervalle, badge de statut, **date du dernier entretien** ; les composants graissables affichent une sous-ligne de graissage (💧 barre, heures/intervalle, statut, bouton Graisser)
 - **Section plateaux** : indicateur actif (★), barre d'heures, badge statut, date dernier entretien, boutons reset + activer
 - **Section bobines** : indicateur actif (★), point couleur, badge matière, barre poids restant, % restant, longueur restante (m), bouton activer
 
@@ -320,6 +324,8 @@ La carte affiche :
 |---------|-----------|-------------|
 | `printer_maintenance.reset_component` | `component`, `entry_id` *(opt)* | Réinitialise le compteur d'un composant après maintenance |
 | `printer_maintenance.set_interval` | `component`, `interval_hours`, `entry_id` *(opt)* | Modifie l'intervalle de maintenance |
+| `printer_maintenance.grease_component` | `component`, `entry_id` *(opt)* | Enregistre un graissage (composants graissables uniquement) |
+| `printer_maintenance.set_greasing_interval` | `component`, `interval_hours`, `entry_id` *(opt)* | Modifie l'intervalle de graissage (composants graissables uniquement) |
 | `printer_maintenance.add_hours` | `hours`, `component` *(opt)*, `entry_id` *(opt)* | Ajoute des heures d'impression manuellement |
 | `printer_maintenance.set_total_hours` | `hours`, `entry_id` *(opt)* | Définit le total d'heures global |
 | `printer_maintenance.set_total_filament` | `meters`, `entry_id` *(opt)* | Définit le total de filament global |
@@ -365,7 +371,7 @@ Le seuil est configurable par entrée d'intégration (Options → Seuil d'alerte
 - [x] Notifications HA automatiques au changement de statut
 - [x] Gestion multi-plateaux (heures, statut, date d'entretien par plateau)
 - [x] Gestion des bobines de filament (matière, marque, décrémentation automatique du poids)
-- [ ] Suivi de graissage par composant : date de dernier graissage + intervalle de graissage configurable (distinct de l'intervalle de maintenance général)
+- [x] Suivi de graissage par composant : date de dernier graissage + intervalle de graissage configurable (distinct de l'intervalle de maintenance général)
 - [ ] Connecteurs OctoPrint / Moonraker / Klipper
 
 ---

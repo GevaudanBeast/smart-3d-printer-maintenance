@@ -23,10 +23,11 @@ async def async_setup_entry(
     printer_name = entry.data.get(CONF_PRINTER_NAME, "Printer")
     unique_prefix = entry.entry_id
 
-    buttons = [
-        ResetComponentButton(coordinator, printer_name, unique_prefix, comp_id, comp_info)
-        for comp_id, comp_info in COMPONENTS.items()
-    ]
+    buttons = []
+    for comp_id, comp_info in COMPONENTS.items():
+        buttons.append(ResetComponentButton(coordinator, printer_name, unique_prefix, comp_id, comp_info))
+        if comp_info.get("default_greasing_interval") is not None:
+            buttons.append(GreaseComponentButton(coordinator, printer_name, unique_prefix, comp_id, comp_info))
 
     # Existing plates
     for plate_id, plate_info in coordinator.get_all_plates().items():
@@ -70,6 +71,35 @@ class ResetComponentButton(ButtonEntity):
 
     async def async_press(self) -> None:
         await self._coordinator.async_reset_component(self._comp_id)
+
+
+class GreaseComponentButton(ButtonEntity):
+    """Button that records a greasing event for a component."""
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(
+        self,
+        coordinator: PrinterMaintenanceCoordinator,
+        printer_name: str,
+        unique_prefix: str,
+        comp_id: str,
+        comp_info: dict[str, Any],
+    ) -> None:
+        self._coordinator = coordinator
+        self._comp_id = comp_id
+        self._attr_unique_id = f"{unique_prefix}_grease_{comp_id}"
+        self._attr_name = f"Grease {comp_info['name']}"
+        self._attr_icon = "mdi:oil"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, unique_prefix)},
+            name=printer_name,
+            manufacturer="Printer Maintenance",
+        )
+
+    async def async_press(self) -> None:
+        await self._coordinator.async_grease_component(self._comp_id)
 
 
 class PlateResetButton(ButtonEntity):

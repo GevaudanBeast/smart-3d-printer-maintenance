@@ -105,6 +105,19 @@ UPDATE_SPOOL_WEIGHT_SCHEMA = vol.Schema({
     _ENTRY_ID_SCHEMA: cv.string,
 })
 
+_GREASABLE_COMPONENTS = [c for c, info in COMPONENTS.items() if info.get("default_greasing_interval") is not None]
+
+GREASE_COMPONENT_SCHEMA = vol.Schema({
+    vol.Required("component"): vol.In(_GREASABLE_COMPONENTS),
+    _ENTRY_ID_SCHEMA: cv.string,
+})
+
+SET_GREASING_INTERVAL_SCHEMA = vol.Schema({
+    vol.Required("component"): vol.In(_GREASABLE_COMPONENTS),
+    vol.Required("interval_hours"): vol.All(vol.Coerce(float), vol.Range(min=1, max=10000)),
+    _ENTRY_ID_SCHEMA: cv.string,
+})
+
 
 def _get_coordinator(
     hass: HomeAssistant, call: ServiceCall
@@ -153,6 +166,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "reset_component", "set_interval", "add_hours", "set_total_hours", "set_total_filament",
             "add_plate", "remove_plate", "set_active_plate", "reset_plate",
             "add_spool", "remove_spool", "set_active_spool", "update_spool_weight",
+            "grease_component", "set_greasing_interval",
         ):
             hass.services.async_remove(DOMAIN, svc)
 
@@ -242,6 +256,17 @@ def _register_services(hass: HomeAssistant) -> None:
         for coord in _get_coordinator(hass, call):
             await coord.async_update_spool_weight(spool_id, remaining_weight_g)
 
+    async def handle_grease_component(call: ServiceCall) -> None:
+        component = call.data["component"]
+        for coord in _get_coordinator(hass, call):
+            await coord.async_grease_component(component)
+
+    async def handle_set_greasing_interval(call: ServiceCall) -> None:
+        component = call.data["component"]
+        interval = call.data["interval_hours"]
+        for coord in _get_coordinator(hass, call):
+            await coord.async_set_greasing_interval(component, interval)
+
     hass.services.async_register(
         DOMAIN, "reset_component", handle_reset_component, schema=RESET_COMPONENT_SCHEMA
     )
@@ -280,4 +305,10 @@ def _register_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(
         DOMAIN, "update_spool_weight", handle_update_spool_weight, schema=UPDATE_SPOOL_WEIGHT_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "grease_component", handle_grease_component, schema=GREASE_COMPONENT_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "set_greasing_interval", handle_set_greasing_interval, schema=SET_GREASING_INTERVAL_SCHEMA
     )

@@ -18,18 +18,23 @@
 const COMPONENTS = [
   { id: "nozzle",           name: "Nozzle",            category: "Extrusion" },
   { id: "heatbreak",        name: "Heatbreak",          category: "Extrusion" },
-  { id: "extruder_gear",    name: "Extruder Gear",      category: "Extrusion" },
-  { id: "belts",            name: "Belts",              category: "Movement"  },
-  { id: "linear_rods",      name: "Linear Rods",        category: "Movement"  },
-  { id: "linear_rails",     name: "Linear Rails",       category: "Movement"  },
+  { id: "extruder_gear",    name: "Extruder Gear",      category: "Extrusion", greasable: true },
+  { id: "belts",            name: "Belts",              category: "Movement",  greasable: true },
+  { id: "linear_rods",      name: "Linear Rods",        category: "Movement",  greasable: true },
+  { id: "linear_rails",     name: "Linear Rails",       category: "Movement",  greasable: true },
   { id: "build_plate",      name: "Build Plate",        category: "Platform"  },
   { id: "build_surface",    name: "Build Surface",      category: "Platform"  },
   { id: "hotend_fan",       name: "Hotend Fan",         category: "Cooling"   },
   { id: "part_cooling_fan", name: "Part Cooling Fan",   category: "Cooling"   },
   { id: "ptfe_tube",        name: "PTFE Tube",          category: "Misc"      },
+  { id: "hotend_screws",    name: "Hotend Screws",      category: "Fasteners" },
+  { id: "extruder_screws",  name: "Extruder Screws",    category: "Fasteners" },
+  { id: "gantry_screws",    name: "Gantry Screws",      category: "Fasteners" },
+  { id: "bed_screws",       name: "Bed Screws",         category: "Fasteners" },
+  { id: "frame_screws",     name: "Frame Screws",       category: "Fasteners" },
 ];
 
-const CATEGORIES = ["Extrusion", "Movement", "Platform", "Cooling", "Misc"];
+const CATEGORIES = ["Extrusion", "Movement", "Platform", "Cooling", "Misc", "Fasteners"];
 
 const STATUS = {
   ok:      { color: "var(--success-color,  #4CAF50)", label: "OK"      },
@@ -102,6 +107,12 @@ class PrinterMaintenanceCard extends HTMLElement {
     });
   }
 
+  async _grease(comp) {
+    await this._hass.callService("button", "press", {
+      entity_id: `button.${this._config.printer}_grease_${comp}`,
+    });
+  }
+
   async _pressButton(entityId) {
     await this._hass.callService("button", "press", { entity_id: entityId });
   }
@@ -146,6 +157,34 @@ class PrinterMaintenanceCard extends HTMLElement {
           ? `<span class="last-date">${new Date(lastReset).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })}</span>`
           : `<span class="last-date never">—</span>`;
 
+        // Greasing sub-row (greasable components only)
+        let greasingHtml = "";
+        if (comp.greasable) {
+          const gsid        = this._sid(`${comp.id}_greasing_status`);
+          const gStatus     = this._val(gsid, "ok");
+          const gUsed       = parseFloat(this._attr(gsid, "greasing_hours_used", 0));
+          const gInterval   = parseFloat(this._attr(gsid, "greasing_interval_hours", 1));
+          const gPct        = Math.min(100, (gUsed / gInterval) * 100).toFixed(1);
+          const gsc         = STATUS[gStatus] || STATUS.ok;
+          const lastGreasing = this._attr(gsid, "last_greasing");
+          const gDateHtml   = lastGreasing
+            ? `<span class="last-date">${new Date(lastGreasing).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })}</span>`
+            : `<span class="last-date never">—</span>`;
+          greasingHtml = `
+          <div class="grease-row">
+            <div class="comp-name-wrap">
+              <span class="grease-label">💧</span>
+              ${gDateHtml}
+            </div>
+            <div class="bar grease-bar">
+              <div class="bar-fill" style="width:${gPct}%;background:${gsc.color}"></div>
+            </div>
+            <span class="comp-time">${gUsed.toFixed(0)}<span class="dim">/${gInterval.toFixed(0)}h</span></span>
+            <span class="badge" style="color:${gsc.color}">${gsc.label}</span>
+            <button class="gbtn" data-comp="${comp.id}" title="Grease ${comp.name}">💧</button>
+          </div>`;
+        }
+
         rows += `
           <div class="comp-row">
             <div class="comp-name-wrap">
@@ -158,7 +197,8 @@ class PrinterMaintenanceCard extends HTMLElement {
             <span class="comp-time">${used.toFixed(0)}<span class="dim">/${interval.toFixed(0)}h</span></span>
             <span class="badge" style="color:${sc.color}">${sc.label}</span>
             <button class="rbtn" data-comp="${comp.id}" title="Reset ${comp.name}">↺</button>
-          </div>`;
+          </div>
+          ${greasingHtml}`;
       }
     }
 
@@ -414,6 +454,34 @@ class PrinterMaintenanceCard extends HTMLElement {
           opacity: .35;
         }
 
+        /* ── greasing sub-row ── */
+        .grease-row {
+          display: grid;
+          grid-template-columns: 108px 1fr 66px 52px 22px;
+          align-items: center;
+          gap: 6px;
+          padding: 1px 0 3px;
+          opacity: .8;
+        }
+        .grease-label {
+          font-size: 0.75em;
+          line-height: 1;
+        }
+        .grease-bar {
+          height: 3px;
+        }
+        .gbtn {
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-size: 0.85em;
+          line-height: 1;
+          padding: 0;
+          opacity: .45;
+          transition: opacity .15s, transform .2s;
+        }
+        .gbtn:hover { opacity: 1; transform: scale(1.3); }
+
         /* ── spool row ── */
         .spool-row {
           display: grid;
@@ -490,6 +558,14 @@ class PrinterMaintenanceCard extends HTMLElement {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         this._pressButton(btn.dataset.entity);
+      });
+    });
+
+    // attach grease button listeners
+    this.shadowRoot.querySelectorAll(".gbtn[data-comp]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this._grease(btn.dataset.comp);
       });
     });
   }

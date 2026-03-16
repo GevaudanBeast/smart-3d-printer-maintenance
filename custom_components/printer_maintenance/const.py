@@ -87,6 +87,7 @@ COMPONENTS: dict[str, dict] = {
     "extruder_gear": {
         "name": "Extruder Gear",
         "default_interval": 400,
+        "default_greasing_interval": 100,
         "icon": "mdi:cog-outline",
         "category": "extrusion",
     },
@@ -94,18 +95,21 @@ COMPONENTS: dict[str, dict] = {
     "belts": {
         "name": "Belts",
         "default_interval": 800,
+        "default_greasing_interval": 300,
         "icon": "mdi:link-variant",
         "category": "movement",
     },
     "linear_rods": {
         "name": "Linear Rods",
         "default_interval": 600,
+        "default_greasing_interval": 100,
         "icon": "mdi:ray-end-arrow",
         "category": "movement",
     },
     "linear_rails": {
         "name": "Linear Rails",
         "default_interval": 600,
+        "default_greasing_interval": 150,
         "icon": "mdi:train",
         "category": "movement",
     },

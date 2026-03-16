@@ -156,6 +156,14 @@ class PrinterMaintenanceCoordinator:
         comp_opts = self._opt(CONF_COMPONENTS, {})
         return float(comp_opts.get(component_id, {}).get("interval_hours", default))
 
+    def _component_greasing_interval(self, component_id: str) -> float | None:
+        """Return the greasing interval for a component, or None if not greasable."""
+        default = COMPONENTS[component_id].get("default_greasing_interval")
+        if default is None:
+            return None
+        comp_opts = self._opt(CONF_COMPONENTS, {})
+        return float(comp_opts.get(component_id, {}).get("greasing_interval_hours", default))
+
     def get_component_data(self, component_id: str) -> dict[str, Any]:
         comp = self._data.get("components", {}).get(component_id, {})
         interval = self._component_interval(component_id)
@@ -177,6 +185,30 @@ class PrinterMaintenanceCoordinator:
             "hours_remaining": round(remaining, 1),
             "status": status,
             "last_reset": comp.get("last_reset"),
+        }
+
+    def get_component_greasing_data(self, component_id: str) -> dict[str, Any] | None:
+        """Return greasing tracking data for a component, or None if not greasable."""
+        interval = self._component_greasing_interval(component_id)
+        if interval is None:
+            return None
+        comp = self._data.get("components", {}).get(component_id, {})
+        hours_used = comp.get("greasing_hours_used", 0.0)
+        remaining = max(0.0, interval - hours_used)
+        if hours_used > interval:
+            status = STATUS_OVERDUE
+        elif hours_used >= interval:
+            status = STATUS_DUE
+        elif remaining <= interval * self.soon_threshold_pct:
+            status = STATUS_SOON
+        else:
+            status = STATUS_OK
+        return {
+            "greasing_hours_used": round(hours_used, 1),
+            "greasing_interval_hours": interval,
+            "greasing_hours_remaining": round(remaining, 1),
+            "greasing_status": status,
+            "last_greasing": comp.get("last_greasing"),
         }
 
     # ------------------------------------------------------------------
@@ -378,6 +410,8 @@ class PrinterMaintenanceCoordinator:
         for comp_id in COMPONENTS:
             comp = components.setdefault(comp_id, {"hours_used": 0.0, "last_reset": None})
             comp["hours_used"] = comp.get("hours_used", 0.0) + hours
+            if COMPONENTS[comp_id].get("default_greasing_interval") is not None:
+                comp["greasing_hours_used"] = comp.get("greasing_hours_used", 0.0) + hours
         active_plate = self.get_active_plate_id()
         if active_plate:
             plates = self._data.setdefault("plates", {})
@@ -415,6 +449,30 @@ class PrinterMaintenanceCoordinator:
                 if comp_id in self._notified_due:
                     self._notified_due.discard(comp_id)
                     persistent_notification.async_dismiss(self.hass, notif_id)
+            # Check greasing status for greasable components
+            greasing = self.get_component_greasing_data(comp_id)
+            if greasing:
+                g_status = greasing["greasing_status"]
+                g_key = f"{comp_id}_greasing"
+                g_notif_id = f"printer_maintenance_{self.entry.entry_id}_{comp_id}_greasing"
+                if g_status in (STATUS_DUE, STATUS_OVERDUE):
+                    if g_key not in self._notified_due:
+                        self._notified_due.add(g_key)
+                        label = STATUS_OVERDUE if g_status == STATUS_OVERDUE else STATUS_DUE
+                        persistent_notification.async_create(
+                            self.hass,
+                            message=(
+                                f"**{comp_info['name']}** needs greasing on **{printer_name}**.\n"
+                                f"Hours since last greasing: {greasing['greasing_hours_used']} h "
+                                f"/ {greasing['greasing_interval_hours']} h ({label})."
+                            ),
+                            title=f"💧 {printer_name} — Greasing {label}",
+                            notification_id=g_notif_id,
+                        )
+                else:
+                    if g_key in self._notified_due:
+                        self._notified_due.discard(g_key)
+                        persistent_notification.async_dismiss(self.hass, g_notif_id)
         # Check active plate
         active_plate = self.get_active_plate_id()
         if active_plate:
@@ -451,7 +509,10 @@ class PrinterMaintenanceCoordinator:
             self._data = stored
             components = self._data.setdefault("components", {})
             for comp_id in COMPONENTS:
-                components.setdefault(comp_id, {"hours_used": 0.0, "last_reset": None})
+                comp = components.setdefault(comp_id, {"hours_used": 0.0, "last_reset": None})
+                if COMPONENTS[comp_id].get("default_greasing_interval") is not None:
+                    comp.setdefault("greasing_hours_used", 0.0)
+                    comp.setdefault("last_greasing", None)
         else:
             initial_hours = float(self.entry.data.get(CONF_INITIAL_HOURS, 0))
             initial_filament = float(self.entry.data.get(CONF_INITIAL_FILAMENT, 0))
@@ -462,7 +523,12 @@ class PrinterMaintenanceCoordinator:
                 "total_jobs_ok": 0,
                 "total_jobs_ko": 0,
                 "components": {
-                    comp_id: {"hours_used": 0.0, "last_reset": None}
+                    comp_id: (
+                        {"hours_used": 0.0, "last_reset": None,
+                         "greasing_hours_used": 0.0, "last_greasing": None}
+                        if COMPONENTS[comp_id].get("default_greasing_interval") is not None
+                        else {"hours_used": 0.0, "last_reset": None}
+                    )
                     for comp_id in COMPONENTS
                 },
             }
@@ -499,6 +565,32 @@ class PrinterMaintenanceCoordinator:
         comp_opts = dict(options.get(CONF_COMPONENTS, {}))
         comp_opt = dict(comp_opts.get(component_id, {}))
         comp_opt["interval_hours"] = interval_hours
+        comp_opts[component_id] = comp_opt
+        options[CONF_COMPONENTS] = comp_opts
+        self.hass.config_entries.async_update_entry(self.entry, options=options)
+        self._notify_listeners()
+
+    async def async_grease_component(self, component_id: str) -> None:
+        """Record a greasing event: reset greasing counter and timestamp."""
+        components = self._data.setdefault("components", {})
+        comp = components.setdefault(component_id, {})
+        comp["greasing_hours_used"] = 0.0
+        comp["last_greasing"] = dt_util.utcnow().isoformat()
+        await self._async_save_data()
+        g_key = f"{component_id}_greasing"
+        if g_key in self._notified_due:
+            self._notified_due.discard(g_key)
+            notif_id = f"printer_maintenance_{self.entry.entry_id}_{component_id}_greasing"
+            persistent_notification.async_dismiss(self.hass, notif_id)
+        self._notify_listeners()
+        _LOGGER.info("Greasing recorded for component: %s", component_id)
+
+    async def async_set_greasing_interval(self, component_id: str, interval_hours: float) -> None:
+        """Update the greasing interval for a component."""
+        options = dict(self.entry.options)
+        comp_opts = dict(options.get(CONF_COMPONENTS, {}))
+        comp_opt = dict(comp_opts.get(component_id, {}))
+        comp_opt["greasing_interval_hours"] = interval_hours
         comp_opts[component_id] = comp_opt
         options[CONF_COMPONENTS] = comp_opts
         self.hass.config_entries.async_update_entry(self.entry, options=options)

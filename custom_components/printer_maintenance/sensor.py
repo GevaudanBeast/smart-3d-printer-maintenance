@@ -58,6 +58,11 @@ async def async_setup_entry(
             ComponentStatusSensor(coordinator, printer_name, unique_prefix, comp_id, comp_info),
             ComponentLastResetSensor(coordinator, printer_name, unique_prefix, comp_id, comp_info),
         ]
+        if comp_info.get("default_greasing_interval") is not None:
+            entities += [
+                ComponentGreasingStatusSensor(coordinator, printer_name, unique_prefix, comp_id, comp_info),
+                ComponentLastGreasingSensor(coordinator, printer_name, unique_prefix, comp_id, comp_info),
+            ]
 
     # Register active plate/spool global sensors
     entities.append(ActivePlateSensor(coordinator, printer_name, unique_prefix))
@@ -308,6 +313,62 @@ class TotalJobsKoSensor(_BaseMaintenanceSensor):
     @property
     def native_value(self) -> int:
         return self._coordinator.total_jobs_ko
+
+
+# ---------------------------------------------------------------------------
+# Per-component greasing sensors
+# ---------------------------------------------------------------------------
+
+
+class ComponentGreasingStatusSensor(_BaseComponentSensor):
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator, printer_name, unique_prefix, comp_id, comp_info):
+        super().__init__(coordinator, printer_name, unique_prefix, comp_id, comp_info)
+        self._attr_unique_id = f"{unique_prefix}_{comp_id}_greasing_status"
+        self._attr_name = f"{comp_info['name']} Greasing Status"
+        self._attr_icon = "mdi:oil"
+
+    @property
+    def native_value(self) -> str | None:
+        d = self._coordinator.get_component_greasing_data(self._comp_id)
+        return d["greasing_status"] if d else None
+
+    @property
+    def icon(self) -> str:
+        d = self._coordinator.get_component_greasing_data(self._comp_id)
+        status = d["greasing_status"] if d else STATUS_OK
+        return STATUS_ICON.get(status, "mdi:oil")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        d = self._coordinator.get_component_greasing_data(self._comp_id)
+        if not d:
+            return {}
+        return {
+            "greasing_hours_used": d["greasing_hours_used"],
+            "greasing_hours_remaining": d["greasing_hours_remaining"],
+            "greasing_interval_hours": d["greasing_interval_hours"],
+            "last_greasing": d["last_greasing"],
+        }
+
+
+class ComponentLastGreasingSensor(_BaseComponentSensor):
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_icon = "mdi:calendar-check"
+
+    def __init__(self, coordinator, printer_name, unique_prefix, comp_id, comp_info):
+        super().__init__(coordinator, printer_name, unique_prefix, comp_id, comp_info)
+        self._attr_unique_id = f"{unique_prefix}_{comp_id}_last_greasing"
+        self._attr_name = f"{comp_info['name']} Last Greasing"
+
+    @property
+    def native_value(self):
+        d = self._coordinator.get_component_greasing_data(self._comp_id)
+        if not d:
+            return None
+        last = d["last_greasing"]
+        return dt_util.parse_datetime(last) if last else None
 
 
 # ── Plate sensors ────────────────────────────────────────────────────────────
