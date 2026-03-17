@@ -79,6 +79,12 @@ RESET_PLATE_SCHEMA = vol.Schema({
     _ENTRY_ID_SCHEMA: cv.string,
 })
 
+SET_PLATE_INTERVAL_SCHEMA = vol.Schema({
+    vol.Required("plate_id"): cv.string,
+    vol.Required("interval_hours"): vol.All(vol.Coerce(float), vol.Range(min=1, max=10000)),
+    _ENTRY_ID_SCHEMA: cv.string,
+})
+
 ADD_SPOOL_SCHEMA = vol.Schema({
     vol.Required("name"): cv.string,
     vol.Optional("material", default="PLA"): cv.string,
@@ -102,6 +108,19 @@ SET_ACTIVE_SPOOL_SCHEMA = vol.Schema({
 UPDATE_SPOOL_WEIGHT_SCHEMA = vol.Schema({
     vol.Required("spool_id"): cv.string,
     vol.Required("remaining_weight_g"): vol.All(vol.Coerce(float), vol.Range(min=0, max=10000)),
+    _ENTRY_ID_SCHEMA: cv.string,
+})
+
+_GREASABLE_COMPONENTS = [c for c, info in COMPONENTS.items() if info.get("default_greasing_interval") is not None]
+
+GREASE_COMPONENT_SCHEMA = vol.Schema({
+    vol.Required("component"): vol.In(_GREASABLE_COMPONENTS),
+    _ENTRY_ID_SCHEMA: cv.string,
+})
+
+SET_GREASING_INTERVAL_SCHEMA = vol.Schema({
+    vol.Required("component"): vol.In(_GREASABLE_COMPONENTS),
+    vol.Required("interval_hours"): vol.All(vol.Coerce(float), vol.Range(min=1, max=10000)),
     _ENTRY_ID_SCHEMA: cv.string,
 })
 
@@ -151,8 +170,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not hass.data[DOMAIN]:
         for svc in (
             "reset_component", "set_interval", "add_hours", "set_total_hours", "set_total_filament",
-            "add_plate", "remove_plate", "set_active_plate", "reset_plate",
+            "add_plate", "remove_plate", "set_active_plate", "reset_plate", "set_plate_interval",
             "add_spool", "remove_spool", "set_active_spool", "update_spool_weight",
+            "grease_component", "set_greasing_interval",
         ):
             hass.services.async_remove(DOMAIN, svc)
 
@@ -215,6 +235,12 @@ def _register_services(hass: HomeAssistant) -> None:
         for coord in _get_coordinator(hass, call):
             await coord.async_reset_plate(plate_id)
 
+    async def handle_set_plate_interval(call: ServiceCall) -> None:
+        plate_id = call.data["plate_id"]
+        interval_hours = call.data["interval_hours"]
+        for coord in _get_coordinator(hass, call):
+            await coord.async_set_plate_interval(plate_id, interval_hours)
+
     async def handle_add_spool(call: ServiceCall) -> None:
         for coord in _get_coordinator(hass, call):
             await coord.async_add_spool(
@@ -241,6 +267,17 @@ def _register_services(hass: HomeAssistant) -> None:
         remaining_weight_g = call.data["remaining_weight_g"]
         for coord in _get_coordinator(hass, call):
             await coord.async_update_spool_weight(spool_id, remaining_weight_g)
+
+    async def handle_grease_component(call: ServiceCall) -> None:
+        component = call.data["component"]
+        for coord in _get_coordinator(hass, call):
+            await coord.async_grease_component(component)
+
+    async def handle_set_greasing_interval(call: ServiceCall) -> None:
+        component = call.data["component"]
+        interval = call.data["interval_hours"]
+        for coord in _get_coordinator(hass, call):
+            await coord.async_set_greasing_interval(component, interval)
 
     hass.services.async_register(
         DOMAIN, "reset_component", handle_reset_component, schema=RESET_COMPONENT_SCHEMA
@@ -270,6 +307,9 @@ def _register_services(hass: HomeAssistant) -> None:
         DOMAIN, "reset_plate", handle_reset_plate, schema=RESET_PLATE_SCHEMA
     )
     hass.services.async_register(
+        DOMAIN, "set_plate_interval", handle_set_plate_interval, schema=SET_PLATE_INTERVAL_SCHEMA
+    )
+    hass.services.async_register(
         DOMAIN, "add_spool", handle_add_spool, schema=ADD_SPOOL_SCHEMA
     )
     hass.services.async_register(
@@ -280,4 +320,10 @@ def _register_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(
         DOMAIN, "update_spool_weight", handle_update_spool_weight, schema=UPDATE_SPOOL_WEIGHT_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "grease_component", handle_grease_component, schema=GREASE_COMPONENT_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "set_greasing_interval", handle_set_greasing_interval, schema=SET_GREASING_INTERVAL_SCHEMA
     )
