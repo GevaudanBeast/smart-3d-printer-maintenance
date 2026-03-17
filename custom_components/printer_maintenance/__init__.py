@@ -79,6 +79,12 @@ RESET_PLATE_SCHEMA = vol.Schema({
     _ENTRY_ID_SCHEMA: cv.string,
 })
 
+SET_PLATE_INTERVAL_SCHEMA = vol.Schema({
+    vol.Required("plate_id"): cv.string,
+    vol.Required("interval_hours"): vol.All(vol.Coerce(float), vol.Range(min=1, max=10000)),
+    _ENTRY_ID_SCHEMA: cv.string,
+})
+
 ADD_SPOOL_SCHEMA = vol.Schema({
     vol.Required("name"): cv.string,
     vol.Optional("material", default="PLA"): cv.string,
@@ -164,7 +170,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not hass.data[DOMAIN]:
         for svc in (
             "reset_component", "set_interval", "add_hours", "set_total_hours", "set_total_filament",
-            "add_plate", "remove_plate", "set_active_plate", "reset_plate",
+            "add_plate", "remove_plate", "set_active_plate", "reset_plate", "set_plate_interval",
             "add_spool", "remove_spool", "set_active_spool", "update_spool_weight",
             "grease_component", "set_greasing_interval",
         ):
@@ -228,6 +234,12 @@ def _register_services(hass: HomeAssistant) -> None:
         plate_id = call.data["plate_id"]
         for coord in _get_coordinator(hass, call):
             await coord.async_reset_plate(plate_id)
+
+    async def handle_set_plate_interval(call: ServiceCall) -> None:
+        plate_id = call.data["plate_id"]
+        interval_hours = call.data["interval_hours"]
+        for coord in _get_coordinator(hass, call):
+            await coord.async_set_plate_interval(plate_id, interval_hours)
 
     async def handle_add_spool(call: ServiceCall) -> None:
         for coord in _get_coordinator(hass, call):
@@ -293,6 +305,9 @@ def _register_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(
         DOMAIN, "reset_plate", handle_reset_plate, schema=RESET_PLATE_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "set_plate_interval", handle_set_plate_interval, schema=SET_PLATE_INTERVAL_SCHEMA
     )
     hass.services.async_register(
         DOMAIN, "add_spool", handle_add_spool, schema=ADD_SPOOL_SCHEMA

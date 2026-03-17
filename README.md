@@ -27,7 +27,7 @@ Designed first for the **Creality K1C** (with [`ha_creality_ws`](https://github.
 - **79+ sensors** — 5 global + 72 per-component (4 maintenance + 2 greasing × 4 greasable) + 2 active-plate/spool indicators, then +4 per plate and +3 per spool added dynamically (no restart required)
 - **Dynamic entities** — adding or removing a plate/spool registers/removes its sensors and buttons instantly
 - **20+ reset & control buttons** — 1 reset + 1 grease per greasable component, 1 reset per other component, 2 per plate (reset / activate), 1 per spool (activate)
-- **15 services** — component counters, intervals, greasing, hours, filament, plates and spools
+- **16 services** — component counters, intervals, greasing, hours, filament, plates (incl. plate interval) and spools
 - **Compact Lovelace card** — auto-registered, shows last maintenance date, plates section and spools section
 - **Persistent storage** — survives HA restarts, resumes in-progress sessions
 - **Multi-printer** — one integration entry per printer
@@ -113,22 +113,37 @@ The card is automatically available after installation. Add it to any dashboard:
 
 ```yaml
 type: custom:printer-maintenance-card
-printer: k1c                    # slugified printer name (lowercase, spaces → _)
-title: "K1C Maintenance"        # optional
+printer: k1c                          # slugified printer name (lowercase, spaces → _)
+title: "K1C Maintenance"              # optional — defaults to printer name in caps
 status_entity: sensor.k1c_print_status  # optional — status pill in header
-plates:                         # optional — list of plate IDs to display
-  - pei_smooth
-  - pei_textured
-spools:                         # optional — list of spool IDs to display
-  - pla_white
-  - petg_black
+# plates and spools are auto-discovered — no need to list them manually.
+# To show a specific subset, override explicitly:
+# plates:
+#   - pei_smooth
+# spools:
+#   - pla_white
 ```
 
-The card displays:
-- Global stats: total print hours · filament used · jobs count
-- Per-component: progress bar, hours used / interval, status badge, **last maintenance date**; greasable components show an extra greasing sub-row (💧 progress bar, hours/interval, status, Grease button)
-- **Plates section**: active indicator (★), hours bar, status badge, last maintenance date, reset + activate buttons
-- **Spools section**: active indicator (★), colour dot, material badge, remaining weight bar, % remaining, remaining length (m), activate button
+> **Plates and spools are auto-discovered** from HA entities — you don't need to list them. The card scans for `sensor.{printer}_plate_*_status` and `sensor.{printer}_spool_*_remaining` automatically.
+
+**What the card displays:**
+- Header: printer name + print status pill (if `status_entity` is set)
+- Stats bar: total print hours · total filament · job count
+- Per-component rows (grouped by category):
+  - Progress bar (hours used / interval), status badge, last maintenance date
+  - Greasable components show a **💧 Greasing** sub-row with its own bar, status and date
+- Build plates: active indicator (★), hours bar, status, last date, reset ↺ + activate ▶
+- Filament spools: active indicator (★), colour dot, material badge, remaining weight bar, % and length
+
+**Interactive controls in the card:**
+
+| Element | Action |
+|---------|--------|
+| `↺` button | Reset maintenance counter (marks component as just maintained) |
+| `💧` button | Record a greasing event |
+| `▶` button | Activate plate / spool |
+| `★ / ☆` | Shows which plate or spool is currently active |
+| `/{interval}h` (underlined on hover) | **Click / tap to edit the interval** inline — type new value, press `Enter` or ✓ to save, `Esc` or ✗ to cancel. Works for maintenance, greasing and plate intervals. On touch devices the underline is always visible. |
 
 ### Services
 
@@ -152,6 +167,7 @@ The card displays:
 | `printer_maintenance.remove_plate` | `plate_id`, `entry_id` *(opt)* | Remove a plate and its entities |
 | `printer_maintenance.set_active_plate` | `plate_id`, `entry_id` *(opt)* | Switch the active plate (only active plate accumulates hours) |
 | `printer_maintenance.reset_plate` | `plate_id`, `entry_id` *(opt)* | Reset a plate counter after cleaning |
+| `printer_maintenance.set_plate_interval` | `plate_id`, `interval_hours`, `entry_id` *(opt)* | Update the maintenance interval for a plate |
 
 **Filament spools**
 
@@ -299,22 +315,37 @@ La carte est disponible automatiquement après installation. Ajoutez-la à n'imp
 
 ```yaml
 type: custom:printer-maintenance-card
-printer: k1c                    # nom en minuscules (espaces → _)
-title: "K1C Maintenance"        # optionnel
+printer: k1c                          # nom en minuscules (espaces → _)
+title: "K1C Maintenance"              # optionnel — défaut : nom de l'imprimante en majuscules
 status_entity: sensor.k1c_print_status  # optionnel — pilule d'état dans l'en-tête
-plates:                         # optionnel — liste des IDs de plateaux à afficher
-  - pei_smooth
-  - pei_textured
-spools:                         # optionnel — liste des IDs de bobines à afficher
-  - pla_white
-  - petg_black
+# Les plateaux et bobines sont auto-découverts — inutile de les lister.
+# Pour n'afficher qu'un sous-ensemble, déclarez-les explicitement :
+# plates:
+#   - pei_smooth
+# spools:
+#   - pla_white
 ```
 
-La carte affiche :
-- Statistiques globales : heures totales · filament utilisé · nombre de jobs
-- Par composant : barre de progression, heures utilisées / intervalle, badge de statut, **date du dernier entretien** ; les composants graissables affichent une sous-ligne de graissage (💧 barre, heures/intervalle, statut, bouton Graisser)
-- **Section plateaux** : indicateur actif (★), barre d'heures, badge statut, date dernier entretien, boutons reset + activer
-- **Section bobines** : indicateur actif (★), point couleur, badge matière, barre poids restant, % restant, longueur restante (m), bouton activer
+> **Plateaux et bobines auto-découverts** depuis les entités HA — la carte scanne automatiquement les `sensor.{printer}_plate_*_status` et `sensor.{printer}_spool_*_remaining`. Aucune config manuelle nécessaire.
+
+**Ce que la carte affiche :**
+- En-tête : nom de l'imprimante + pilule d'état (si `status_entity` configuré)
+- Barre de stats : heures d'impression totales · filament · nombre de jobs
+- Lignes par composant (groupées par catégorie) :
+  - Barre de progression (heures / intervalle), badge statut, date du dernier entretien
+  - Composants graissables : sous-ligne **💧 Greasing** avec barre, statut et date dédiés
+- Plateaux : indicateur actif (★), barre d'heures, statut, date, reset ↺ + activer ▶
+- Bobines : indicateur actif (★), point couleur, badge matière, barre poids restant, % et longueur
+
+**Contrôles interactifs dans la carte :**
+
+| Élément | Action |
+|---------|--------|
+| Bouton `↺` | Réinitialise le compteur de maintenance (composant vient d'être entretenu) |
+| Bouton `💧` | Enregistre un graissage |
+| Bouton `▶` | Active le plateau ou la bobine |
+| `★ / ☆` | Indique quel plateau ou quelle bobine est actif |
+| `/{intervalle}h` (souligné au survol) | **Clic / tap pour modifier l'intervalle** en ligne — saisissez la nouvelle valeur, `Entrée` ou ✓ pour sauvegarder, `Échap` ou ✗ pour annuler. Fonctionne pour la maintenance, le graissage et les plateaux. Sur écrans tactiles, le soulignement est toujours visible. |
 
 ### Services
 
@@ -338,6 +369,7 @@ La carte affiche :
 | `printer_maintenance.remove_plate` | `plate_id`, `entry_id` *(opt)* | Supprime un plateau et ses entités |
 | `printer_maintenance.set_active_plate` | `plate_id`, `entry_id` *(opt)* | Change le plateau actif (seul le plateau actif accumule les heures) |
 | `printer_maintenance.reset_plate` | `plate_id`, `entry_id` *(opt)* | Réinitialise le compteur d'un plateau après nettoyage |
+| `printer_maintenance.set_plate_interval` | `plate_id`, `interval_hours`, `entry_id` *(opt)* | Modifie l'intervalle de maintenance d'un plateau |
 
 **Bobines de filament**
 

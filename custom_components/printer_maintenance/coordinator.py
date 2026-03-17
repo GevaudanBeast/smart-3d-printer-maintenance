@@ -750,6 +750,16 @@ class PrinterMaintenanceCoordinator:
         await self._async_save_data()
         self._notify_listeners()
 
+    async def async_set_plate_interval(self, plate_id: str, interval_hours: float) -> None:
+        """Update the maintenance interval for a build plate."""
+        plates = self._data.get("plates", {})
+        if plate_id not in plates:
+            return
+        plates[plate_id]["interval_hours"] = interval_hours
+        await self._async_save_data()
+        self._notify_listeners()
+        _LOGGER.info("Updated interval for plate %s to %.1f h", plate_id, interval_hours)
+
     # ------------------------------------------------------------------
     # Spool methods
     # ------------------------------------------------------------------
