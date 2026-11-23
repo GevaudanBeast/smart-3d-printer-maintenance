@@ -33,4 +33,6 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: "v${{ steps.version.outputs.version }}"
           generate_release_notes: true
+          # Une etiquette avec suffixe (v0.0.6-beta.1) reste une pre-version.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: dist/printer_maintenance-${{ steps.version.outputs.version }}.zip
