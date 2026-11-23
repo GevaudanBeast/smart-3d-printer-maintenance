@@ -13,6 +13,7 @@ from homeassistant.helpers import config_validation as cv
 from .const import COMPONENTS, DOMAIN, PLATFORMS
 from .coordinator import PrinterMaintenanceCoordinator
 from .frontend import async_register_frontend
+from .session import migrate_options_1_2
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -135,6 +136,21 @@ def _get_coordinator(
         coord = entries.get(entry_id)
         return [coord] if coord else []
     return list(entries.values())
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate config entries: 1.1 -> 1.2 adds "finished" to completed states."""
+    if entry.version > 1:
+        return False
+    if entry.version == 1 and entry.minor_version < 2:
+        hass.config_entries.async_update_entry(
+            entry,
+            data=migrate_options_1_2(dict(entry.data)),
+            options=migrate_options_1_2(dict(entry.options)),
+            minor_version=2,
+        )
+        _LOGGER.info("Config entry %s migrated to 1.2", entry.entry_id)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

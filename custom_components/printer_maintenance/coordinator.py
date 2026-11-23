@@ -33,7 +33,6 @@ from .const import (
     DEFAULT_PRINTING_STATES,
     CONF_SOON_THRESHOLD,
     DEFAULT_SOON_THRESHOLD,
-    DOMAIN,
     MATERIAL_DENSITIES,
     STATUS_DUE,
     STATUS_OK,
@@ -42,6 +41,8 @@ from .const import (
     STORAGE_KEY,
     STORAGE_VERSION,
 )
+
+from .session import UNAVAILABLE_STATES, classify_transition
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -67,6 +68,8 @@ class PrinterMaintenanceCoordinator:
         self._print_start_time: datetime | None = None
         # Hours accumulated in previous segments of the same session (across pauses)
         self._session_hours: float = 0.0
+        # Last real printer state (never unknown/unavailable), persisted
+        self._last_status: str | None = None
         # Last known filament entity value (for delta computation)
         self._last_filament_value: float | None = None
         # Filament accumulated since last disk save (throttle I/O)
@@ -242,12 +245,18 @@ class PrinterMaintenanceCoordinator:
                 except ValueError:
                     pass
 
-        # Restore in-progress session after HA restart
+        # Restore in-progress session after HA restart. The printer entity is
+        # often still unavailable at this point: fall back to the last real
+        # state persisted before the restart.
+        self._last_status = self._data.get("last_status")
         current = self.hass.states.get(self.status_entity)
-        if current is None:
+        if current is not None and current.state not in UNAVAILABLE_STATES:
+            state = current.state
+            self._last_status = state
+        elif self._last_status is not None:
+            state = self._last_status
+        else:
             return
-
-        state = current.state
         if state in self.printing_states:
             self._session_hours = self._data.get("session_hours", 0.0)
             saved_start = self._data.get("session_start")
@@ -278,22 +287,29 @@ class PrinterMaintenanceCoordinator:
     @callback
     def _handle_status_change(self, event: Any) -> None:
         new_state = event.data.get("new_state")
-        old_state = event.data.get("old_state")
-
         if new_state is None:
             return
 
         new = new_state.state
-        old = old_state.state if old_state else None
-
-        is_printing = new in self.printing_states
-        was_printing = old in self.printing_states
-        is_paused = new in self.paused_states
-        was_paused = old in self.paused_states
+        action = classify_transition(
+            self._last_status,
+            new,
+            self.printing_states,
+            self.paused_states,
+            self.completed_states,
+            self.failure_states,
+        )
+        if action == "ignore":
+            # Printer offline / unknown (Wi-Fi drop, HA restart): keep the
+            # session running and decide on the next real state.
+            _LOGGER.debug("Status %s ignored (session kept)", new)
+            return
+        self._last_status = new
+        self._data["last_status"] = new
 
         # ── Print started (from idle, stopped, OR resumed from pause) ────────
-        if is_printing and not was_printing:
-            if not was_paused:
+        if action in ("start", "resume"):
+            if action == "start":
                 # Fresh session start
                 self._session_hours = 0.0
                 self._data["session_hours"] = 0.0
@@ -304,7 +320,7 @@ class PrinterMaintenanceCoordinator:
             _LOGGER.debug("Print segment started (session_hours=%.2f)", self._session_hours)
 
         # ── Paused (from printing) ────────────────────────────────────────────
-        elif is_paused and was_printing:
+        elif action == "pause":
             if self._print_start_time:
                 elapsed = (dt_util.utcnow() - self._print_start_time).total_seconds() / 3600
                 self._session_hours += elapsed
@@ -315,7 +331,7 @@ class PrinterMaintenanceCoordinator:
             _LOGGER.debug("Print paused (session_hours=%.2f)", self._session_hours)
 
         # ── Session ended (from printing or paused → any final state) ─────────
-        elif not is_printing and not is_paused and (was_printing or was_paused):
+        elif action.startswith("end"):
             if self._print_start_time:
                 elapsed = (dt_util.utcnow() - self._print_start_time).total_seconds() / 3600
                 self._session_hours += elapsed
@@ -347,6 +363,10 @@ class PrinterMaintenanceCoordinator:
 
             self._data.pop("session_start", None)
             self._data.pop("session_hours", None)
+            self.hass.async_create_task(self._async_save_data())
+
+        else:
+            # No session change, but persist the last real state.
             self.hass.async_create_task(self._async_save_data())
 
         self._notify_listeners()

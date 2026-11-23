@@ -43,6 +43,7 @@ class PrinterMaintenanceConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Printer Maintenance."""
 
     VERSION = 1
+    MINOR_VERSION = 2
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}

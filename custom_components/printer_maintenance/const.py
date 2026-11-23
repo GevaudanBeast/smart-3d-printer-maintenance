@@ -1,7 +1,6 @@
 """Constants for the 3D Printer Maintenance integration."""
 from __future__ import annotations
 
-import math
 
 DOMAIN = "printer_maintenance"
 STORAGE_VERSION = 1
@@ -39,7 +38,7 @@ DEFAULT_PRINTING_STATES = ["printing"]
 # States where the session is paused but NOT ended (time stops, no job count yet)
 DEFAULT_PAUSED_STATES = ["paused", "pause"]
 # States that mean a successful completion → jobs_ok
-DEFAULT_COMPLETED_STATES = ["completed", "complete", "finish"]
+DEFAULT_COMPLETED_STATES = ["completed", "complete", "finish", "finished"]
 # States that mean an explicit failure → jobs_ko (anything else = ignored)
 DEFAULT_FAILURE_STATES = ["stopped", "error", "cancelled", "failed"]
 
